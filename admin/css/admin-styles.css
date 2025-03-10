@@ -1,0 +1,375 @@
+/**
+ * Admin Styles für CX Heuristics
+ * Spezifische Stile für den Admin-Bereich
+ */
+
+/* Admin Container */
+.admin-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.admin-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    color: var(--primary-color);
+}
+
+.admin-controls {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Heuristics List */
+.heuristics-list {
+    margin-top: 2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.heuristic-item {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.heuristic-item:last-child {
+    border-bottom: none;
+}
+
+.heuristic-item:hover {
+    background-color: var(--hover-bg-color);
+}
+
+.heuristic-info {
+    flex-grow: 1;
+}
+
+.heuristic-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.heuristic-description {
+    color: var(--text-color-secondary);
+    font-size: 0.9rem;
+}
+
+.heuristic-category {
+    display: inline-block;
+    background-color: var(--accent-color-light);
+    color: var(--accent-color);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.heuristic-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Search and Filter */
+.search-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-input-container {
+    position: relative;
+    flex-grow: 1;
+}
+
+.search-input-container span {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-color-secondary);
+}
+
+.search-input-container input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.filter-container select {
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+    min-width: 180px;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 2rem auto;
+    padding: 0;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    max-height: calc(100vh - 4rem);
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--primary-color);
+}
+
+.close-modal {
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: var(--text-color-secondary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+    color: var(--text-color);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    justify-content: flex-end;
+}
+
+/* Category and Related Selection */
+.category-selection,
+.related-selection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.tag-item {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--accent-color-light);
+    color: var(--accent-color);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+.tag-item .remove-tag {
+    cursor: pointer;
+    margin-left: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.new-category-input {
+    display: flex;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.new-category-input input {
+    flex-grow: 1;
+}
+
+.icon-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--primary-color);
+    cursor: pointer;
+    padding: 0 0.5rem;
+}
+
+/* Examples */
+.example-item {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    position: relative;
+}
+
+.example-item textarea {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.remove-example {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    color: var(--danger-color);
+    cursor: pointer;
+}
+
+/* Confirm Dialog */
+.confirm-content {
+    max-width: 500px;
+}
+
+.danger-button {
+    background-color: var(--danger-color);
+}
+
+.danger-button:hover {
+    background-color: var(--danger-hover-color);
+}
+
+/* Preview */
+.preview-content {
+    max-width: 900px;
+}
+
+.preview-container {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+/* Backup Status */
+.backup-status {
+    display: flex;
+    align-items: center;
+    margin-top: 2rem;
+    padding: 0.8rem 1rem;
+    background-color: var(--success-bg-color);
+    color: var(--success-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.backup-status .material-icons {
+    margin-right: 0.5rem;
+    font-size: 1.2rem;
+}
+
+/* Loading Indicator */
+.loading-indicator {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-color-secondary);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .admin-controls {
+        margin-top: 1rem;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .search-bar {
+        flex-direction: column;
+    }
+    
+    .search-input-container,
+    .filter-container {
+        width: 100%;
+    }
+    
+    .heuristic-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .heuristic-actions {
+        margin-top: 1rem;
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions button {
+        width: 100%;
+    }
+}
