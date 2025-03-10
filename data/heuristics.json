@@ -1,0 +1,60 @@
+{
+  "categories": [
+    {
+      "id": "usability",
+      "name": "Usability",
+      "icon": "hand-pointer",
+      "description": "Usability-bezogene Heuristiken zur Verbesserung der Benutzerfreundlichkeit",
+      "heuristics": [
+        {
+          "id": "usability-1",
+          "title": "Systemstatus klar kommunizieren",
+          "description": "Das System sollte den Benutzer immer über den aktuellen Status informieren, durch angemessenes Feedback innerhalb einer angemessenen Zeit.",
+          "examples": [
+            "Ladebalken zeigen Fortschritt bei zeitintensiven Operationen",
+            "Farbliche Kennzeichnung von Formularfeldern mit Validierungsfehlern",
+            "Bestätigungsnachrichten nach erfolgreicher Aktion"
+          ]
+        },
+        {
+          "id": "usability-2",
+          "title": "Konsistenz und Standards einhalten",
+          "description": "Benutzer sollten sich nicht fragen müssen, ob verschiedene Wörter, Situationen oder Aktionen dasselbe bedeuten. Folgen Sie Plattformkonventionen.",
+          "examples": [
+            "Konsistente Terminologie in der gesamten Anwendung",
+            "Einheitliches Farbschema für interaktive Elemente",
+            "Standardisierte Positionierung von Navigationselementen"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "accessibility",
+      "name": "Barrierefreiheit",
+      "icon": "universal-access",
+      "description": "Heuristiken zur Sicherstellung der Zugänglichkeit für alle Benutzer",
+      "heuristics": [
+        {
+          "id": "accessibility-1",
+          "title": "Ausreichenden Farbkontrast bieten",
+          "description": "Text und interaktive Elemente sollten einen ausreichenden Kontrast zur Hintergrundfarbe aufweisen, um für Benutzer mit Sehbehinderungen lesbar zu sein.",
+          "examples": [
+            "Kontrastrate von mindestens 4,5:1 für normalen Text",
+            "Dunkler Text auf hellem Hintergrund oder umgekehrt",
+            "Keine Informationsvermittlung ausschließlich durch Farbe"
+          ]
+        },
+        {
+          "id": "accessibility-2",
+          "title": "Tastaturzugänglichkeit sicherstellen",
+          "description": "Alle Funktionen sollten über die Tastatur zugänglich sein, ohne dass spezifische Timing-Anforderungen für einzelne Tastenanschläge erforderlich sind.",
+          "examples": [
+            "Fokus-Indikatoren für alle interaktiven Elemente",
+            "Logische Tab-Reihenfolge durch das Interface",
+            "Keine Funktionen, die ausschließlich bei Hover oder Mausklick funktionieren"
+          ]
+        }
+      ]
+    }
+  ]
+}
