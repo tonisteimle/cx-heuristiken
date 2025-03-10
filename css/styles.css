@@ -1,0 +1,533 @@
+/* Base Styles and Variables */
+:root {
+    --background-dark: #121212;
+    --surface-dark: #1e1e1e;
+    --surface-dark-hover: #2a2a2a;
+    --surface-lighter: #2d2d2d;
+    --primary-text: #ffffff;
+    --secondary-text: #b3b3b3;
+    --accent-color: #4dabf7;
+    --accent-color-hover: #339af0;
+    --divider-color: #333333;
+    --card-shadow: 0 3px 4px rgba(0, 0, 0, 0.5);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--background-dark);
+    color: var(--primary-text);
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+a {
+    color: var(--primary-text);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: var(--accent-color);
+}
+
+ul {
+    list-style: none;
+}
+
+/* Header Styles */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--divider-color);
+}
+
+header .logo h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+header nav ul {
+    display: flex;
+}
+
+header nav ul li {
+    margin-left: 1.5rem;
+}
+
+header nav ul li a {
+    font-weight: 500;
+    padding: 0.3rem 0;
+}
+
+header nav ul li a.active {
+    border-bottom: 2px solid var(--accent-color);
+}
+
+header nav ul li a.admin-link {
+    color: #555555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    transition: background-color 0.3s ease;
+    position: relative;
+    top: -3px;
+}
+
+header nav ul li a.admin-link:hover {
+    color: #777777;
+    background-color: var(--surface-dark-hover);
+}
+
+header nav ul li a.admin-link::before {
+    content: "\e8b8"; /* settings icon from Material Icons */
+    font-family: 'Material Icons';
+    font-size: 1.2rem;
+}
+
+/* Hero Section */
+.hero {
+    max-width: 900px;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    text-align: center;
+}
+
+.hero h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+}
+
+.hero p {
+    font-size: 1rem;
+    color: var(--secondary-text);
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+/* Main Content Layout */
+.content-container {
+    display: flex;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+/* Categories Sidebar */
+.categories-sidebar {
+    width: 220px;
+    padding-right: 1.5rem;
+}
+
+.categories-sidebar h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--secondary-text);
+    margin-bottom: 1rem;
+}
+
+.categories-sidebar ul li {
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.categories-sidebar ul li:hover,
+.categories-sidebar ul li.active {
+    background-color: var(--surface-dark-hover);
+}
+
+.categories-sidebar ul li .material-icons {
+    margin-right: 8px;
+    font-size: 1rem;
+}
+
+/* Main Content Area */
+.main-content {
+    flex: 1;
+}
+
+.category-header {
+    margin-bottom: 1.5rem;
+}
+
+.category-header h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.3rem;
+}
+
+.category-header p {
+    color: var(--secondary-text);
+    font-size: 0.9rem;
+}
+
+/* Heuristics Grid */
+.heuristics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.2rem;
+}
+
+.heuristic-card {
+    background-color: var(--surface-dark);
+    border-radius: 6px;
+    padding: 1.2rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--card-shadow);
+}
+
+.heuristic-card:hover {
+    transform: translateY(-3px);
+    background-color: var(--surface-dark-hover);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.heuristic-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 1.2rem auto;
+    background-color: var(--surface-lighter);
+    border-radius: 50%;
+}
+
+.heuristic-card-icon .material-icons {
+    font-size: 32px;
+    color: var(--accent-color);
+}
+
+.heuristic-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.heuristic-card p {
+    color: var(--secondary-text);
+    font-size: 0.85rem;
+    flex-grow: 1;
+}
+
+.heuristic-card .categories {
+    margin-top: 0.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.heuristic-card .category-tag {
+    font-size: 0.65rem;
+    background-color: var(--surface-lighter);
+    padding: 0.2rem 0.6rem;
+    border-radius: 100px;
+    color: var(--secondary-text);
+}
+
+/* Detail Page Styles */
+.detail-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+.back-link {
+    margin-bottom: 1.5rem;
+    display: inline-block;
+}
+
+.back-link a {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.back-link .material-icons {
+    margin-right: 0.3rem;
+    font-size: 1.1rem;
+}
+
+.heuristic-detail {
+    background-color: var(--surface-dark);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--card-shadow);
+}
+
+.heuristic-detail-header {
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--divider-color);
+    padding-bottom: 1.2rem;
+}
+
+.heuristic-detail-header .icon-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 1.2rem auto;
+    background-color: var(--surface-lighter);
+    border-radius: 50%;
+}
+
+.heuristic-detail-header .material-icons {
+    font-size: 40px;
+    color: var(--accent-color);
+}
+
+.heuristic-detail-header h1 {
+    font-size: 1.8rem;
+    margin-bottom: 0.8rem;
+}
+
+.heuristic-detail-header .categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.8rem;
+}
+
+.heuristic-detail-header .category-tag {
+    font-size: 0.7rem;
+    background-color: var(--surface-lighter);
+    padding: 0.25rem 0.7rem;
+    border-radius: 100px;
+    color: var(--secondary-text);
+}
+
+.heuristic-detail-content section {
+    margin-bottom: 1.5rem;
+}
+
+.heuristic-detail-content h2 {
+    font-size: 1.2rem;
+    margin-bottom: 0.8rem;
+    color: var(--accent-color);
+}
+
+.heuristic-detail-content .guideline {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 1.2rem;
+    padding: 0.8rem;
+    background-color: var(--surface-lighter);
+    border-left: 3px solid var(--accent-color);
+    border-radius: 4px;
+}
+
+.heuristic-detail-content .reasoning,
+.heuristic-detail-content .examples {
+    line-height: 1.6;
+    font-size: 0.9rem;
+}
+
+.example-item {
+    background-color: var(--surface-lighter);
+    border-radius: 6px;
+    padding: 1.2rem;
+    margin-bottom: 1.2rem;
+}
+
+.example-item h3 {
+    font-size: 1.05rem;
+    margin-bottom: 0.8rem;
+    color: var(--primary-text);
+}
+
+/* Related Heuristics */
+.related-heuristics h2 {
+    margin-bottom: 1.2rem;
+    font-size: 1.2rem;
+}
+
+.related-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.2rem;
+}
+
+/* Markdown Content Styling */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    margin-top: 1.2rem;
+    margin-bottom: 0.8rem;
+}
+
+.markdown-content h1 { font-size: 1.6rem; }
+.markdown-content h2 { font-size: 1.4rem; }
+.markdown-content h3 { font-size: 1.2rem; }
+.markdown-content h4 { font-size: 1.1rem; }
+.markdown-content h5 { font-size: 1rem; }
+.markdown-content h6 { font-size: 0.9rem; }
+
+.markdown-content p {
+    margin-bottom: 1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin-bottom: 1rem;
+    padding-left: 1.2rem;
+}
+
+.markdown-content ul {
+    list-style-type: disc;
+}
+
+.markdown-content ol {
+    list-style-type: decimal;
+}
+
+.markdown-content li {
+    margin-bottom: 0.4rem;
+}
+
+.markdown-content a {
+    color: var(--accent-color);
+    text-decoration: underline;
+}
+
+.markdown-content blockquote {
+    border-left: 3px solid var(--accent-color);
+    padding-left: 0.8rem;
+    margin-left: 0.8rem;
+    margin-bottom: 1rem;
+    color: var(--secondary-text);
+}
+
+.markdown-content code {
+    background-color: var(--surface-lighter);
+    padding: 0.15rem 0.3rem;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.markdown-content pre {
+    background-color: var(--surface-lighter);
+    padding: 0.8rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.markdown-content pre code {
+    background-color: transparent;
+    padding: 0;
+}
+
+/* Loading Indicators */
+.loading-indicator,
+.loading {
+    color: var(--secondary-text);
+    text-align: center;
+    padding: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    color: var(--secondary-text);
+    border-top: 1px solid var(--divider-color);
+    font-size: 0.8rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 900px) {
+    .content-container {
+        flex-direction: column;
+    }
+
+    .categories-sidebar {
+        width: 100%;
+        padding-right: 0;
+        margin-bottom: 1.5rem;
+    }
+
+    .categories-sidebar ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .categories-sidebar ul li {
+        margin-bottom: 0;
+        font-size: 0.85rem;
+    }
+
+    .hero h1 {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 600px) {
+    header {
+        flex-direction: column;
+        padding: 0.8rem;
+    }
+
+    header .logo {
+        margin-bottom: 0.8rem;
+    }
+
+    header nav ul {
+        justify-content: center;
+    }
+
+    header nav ul li {
+        margin: 0 0.8rem;
+    }
+
+    .hero h1 {
+        font-size: 1.6rem;
+    }
+
+    .hero p {
+        font-size: 0.9rem;
+    }
+
+    .heuristics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .related-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .heuristic-detail-header h1 {
+        font-size: 1.5rem;
+    }
+}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heuristik Details | CX Heuristics</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1><a href="index.html">CX Heuristics</a></h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="index.html" class="active">Kategorien</a></li>
+                <li><a href="#">Bibliothek</a></li>
+                <li><a href="#">Über uns</a></li>
+                <li><a href="admin/index.html" class="admin-link" title="Administration"></a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="detail-container">
+        <div class="back-link">
+            <a href="index.html"><span class="material-icons">arrow_back</span> Zurück zur Übersicht</a>
+        </div>
+
+        <article class="heuristic-detail" id="heuristic-detail">
+            <!-- Heuristic detail content will be loaded here via JavaScript -->
+            <div class="loading-indicator">Daten werden geladen...</div>
+        </article>
+
+        <section class="related-heuristics">
+            <h2>Verwandte Heuristiken</h2>
+            <div class="related-grid" id="related-heuristics">
+                <!-- Related heuristics will be loaded here via JavaScript -->
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 CX Heuristics</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/details.js"></script>
+</body>
+</html>
