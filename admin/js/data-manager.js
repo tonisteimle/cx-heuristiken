@@ -42,8 +42,8 @@ class DataManager {
                 return response.json();
             })
             .then(data => {
-                this.heuristics = data.heuristics || [];
-                this.categories = data.categories || [];
+                // Verarbeiten der neuen Datenstruktur
+                this.processData(data);
                 console.log('Daten vom Server geladen');
                 
                 // Event auslösen, wenn vorhanden
@@ -56,8 +56,59 @@ class DataManager {
             .catch(error => {
                 console.error('Fehler beim Laden der Daten vom Server:', error);
                 this.handleError(error);
-                return { heuristics: [], categories: [] };
+                
+                // Versuche Daten von lokaler JSON-Datei zu laden
+                return fetch('/data/heuristics.json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw error; // Rethrow original error if local file also fails
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.processData(data);
+                        console.log('Daten von lokaler JSON-Datei geladen');
+                        
+                        if (typeof this.onDataChanged === 'function') {
+                            this.onDataChanged();
+                        }
+                        
+                        return data;
+                    })
+                    .catch(() => {
+                        // Wenn auch die lokale Datei nicht funktioniert, leere Daten zurückgeben
+                        return { categories: [] };
+                    });
             });
+    }
+    
+    /**
+     * Verarbeitet die Daten aus dem neuen Format (Kategorien mit eingebetteten Heuristiken)
+     * @param {Object} data Die zu verarbeitenden Daten
+     */
+    processData(data) {
+        this.categories = data.categories || [];
+        this.heuristics = [];
+        
+        // Heuristiken aus den Kategorien extrahieren
+        if (data.categories && Array.isArray(data.categories)) {
+            data.categories.forEach(category => {
+                if (category.heuristics && Array.isArray(category.heuristics)) {
+                    category.heuristics.forEach(heuristic => {
+                        // Heuristik mit Kategorie-Informationen anreichern
+                        this.heuristics.push({
+                            ...heuristic,
+                            categoryId: category.id,
+                            // Wenn category-Array nicht existiert, erstelle es
+                            category: heuristic.category || [category.name]
+                        });
+                    });
+                }
+            });
+        } else if (data.heuristics) {
+            // Fallback für altes Format
+            this.heuristics = data.heuristics;
+        }
     }
     
     /**
@@ -438,9 +489,11 @@ class DataManager {
     filterByCategory(categoryName) {
         if (!categoryName) return this.heuristics;
         
-        return this.heuristics.filter(h => 
-            h.category && h.category.includes(categoryName)
-        );
+        return this.heuristics.filter(h => {
+            // Prüfe sowohl auf category-Array als auch auf categoryId
+            return (h.category && h.category.includes(categoryName)) || 
+                   (h.categoryId && this.categories.find(c => c.id === h.categoryId && c.name === categoryName));
+        });
     }
     
     /**
@@ -459,10 +512,29 @@ class DataManager {
      * Exportiert alle Daten als JSON-Datei
      */
     exportData() {
+        // Daten im neuen Format vorbereiten
+        const exportCategories = this.categories.map(category => {
+            // Deep copy der Kategorie erstellen
+            const categoryCopy = { ...category };
+            
+            // Heuristiken dieser Kategorie finden
+            const categoryHeuristics = this.heuristics.filter(h => 
+                h.categoryId === category.id || 
+                (h.category && h.category.includes(category.name))
+            );
+            
+            // Bereite Heuristiken vor (entferne categoryId und andere temporäre Felder)
+            categoryCopy.heuristics = categoryHeuristics.map(h => {
+                const { categoryId, ...heuristicData } = h;
+                return heuristicData;
+            });
+            
+            return categoryCopy;
+        });
+        
         // Daten zum Export vorbereiten
         const data = {
-            heuristics: this.heuristics,
-            categories: this.categories,
+            categories: exportCategories,
             exportDate: new Date().toISOString(),
             version: '1.0'
         };

@@ -47,10 +47,15 @@ function initEditor() {
 
 // Initialisiert den Icon-Selector
 function initIconSelector() {
+    if (!iconContainer) {
+        console.warn('Icon container element not found');
+        return;
+    }
+    
     // Icon-Selector erstellen
     iconSelector = createIconSelector({
         container: iconContainer,
-        selectedIcon: 'help',
+        selectedIcon: currentHeuristic?.icon || 'help',
         onSelect: (icon) => {
             // Zum aktuellen Heuristik-Objekt hinzufügen
             if (currentHeuristic) {

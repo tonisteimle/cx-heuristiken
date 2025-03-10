@@ -1,13 +1,13 @@
 {
   "categories": [
     {
-      "id": "usability",
-      "name": "Usability",
-      "icon": "hand-pointer",
-      "description": "Usability-bezogene Heuristiken zur Verbesserung der Benutzerfreundlichkeit",
+      "id": "feedback-communication",
+      "name": "Feedback & Kommunikation",
+      "icon": "feedback",
+      "description": "Heuristiken zur klaren Kommunikation zwischen System und Benutzer",
       "heuristics": [
         {
-          "id": "usability-1",
+          "id": "system-status",
           "title": "Systemstatus klar kommunizieren",
           "description": "Das System sollte den Benutzer immer über den aktuellen Status informieren, durch angemessenes Feedback innerhalb einer angemessenen Zeit.",
           "examples": [
@@ -15,9 +15,17 @@
             "Farbliche Kennzeichnung von Formularfeldern mit Validierungsfehlern",
             "Bestätigungsnachrichten nach erfolgreicher Aktion"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "id": "interaction-design",
+      "name": "Interaktionsdesign",
+      "icon": "touch_app",
+      "description": "Heuristiken zur Verbesserung der Interaktion zwischen Benutzern und Interfaces",
+      "heuristics": [
         {
-          "id": "usability-2",
+          "id": "consistency-standards",
           "title": "Konsistenz und Standards einhalten",
           "description": "Benutzer sollten sich nicht fragen müssen, ob verschiedene Wörter, Situationen oder Aktionen dasselbe bedeuten. Folgen Sie Plattformkonventionen.",
           "examples": [
@@ -31,11 +39,11 @@
     {
       "id": "accessibility",
       "name": "Barrierefreiheit",
-      "icon": "universal-access",
-      "description": "Heuristiken zur Sicherstellung der Zugänglichkeit für alle Benutzer",
+      "icon": "accessibility",
+      "description": "Heuristiken zur Sicherstellung der Zugänglichkeit für alle Benutzer, unabhängig von ihren Fähigkeiten",
       "heuristics": [
         {
-          "id": "accessibility-1",
+          "id": "color-contrast",
           "title": "Ausreichenden Farbkontrast bieten",
           "description": "Text und interaktive Elemente sollten einen ausreichenden Kontrast zur Hintergrundfarbe aufweisen, um für Benutzer mit Sehbehinderungen lesbar zu sein.",
           "examples": [
@@ -45,7 +53,7 @@
           ]
         },
         {
-          "id": "accessibility-2",
+          "id": "keyboard-accessibility",
           "title": "Tastaturzugänglichkeit sicherstellen",
           "description": "Alle Funktionen sollten über die Tastatur zugänglich sein, ohne dass spezifische Timing-Anforderungen für einzelne Tastenanschläge erforderlich sind.",
           "examples": [
@@ -55,6 +63,41 @@
           ]
         }
       ]
+    },
+    {
+      "id": "visual-design",
+      "name": "Visuelles Design",
+      "icon": "palette",
+      "description": "Heuristiken zur visuellen Gestaltung und ästhetischen Kommunikation",
+      "heuristics": []
+    },
+    {
+      "id": "user-control",
+      "name": "Benutzerkontrolle",
+      "icon": "settings",
+      "description": "Heuristiken, die Benutzern Kontrolle und Freiheit in ihrer Erfahrung geben",
+      "heuristics": []
+    },
+    {
+      "id": "error-management",
+      "name": "Fehlerprävention & -behebung",
+      "icon": "error_outline",
+      "description": "Heuristiken, die Benutzer beim Vermeiden und Beheben von Fehlern unterstützen",
+      "heuristics": []
+    },
+    {
+      "id": "cognitive-load",
+      "name": "Kognitive Belastung",
+      "icon": "psychology",
+      "description": "Heuristiken zur Minimierung der mentalen Anstrengung bei der Nutzung des Systems",
+      "heuristics": []
+    },
+    {
+      "id": "information-architecture",
+      "name": "Informationsarchitektur",
+      "icon": "account_tree",
+      "description": "Heuristiken zur Organisation und Strukturierung von Inhalten",
+      "heuristics": []
     }
   ]
 }
