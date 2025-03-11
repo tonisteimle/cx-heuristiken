@@ -17,8 +17,10 @@ const heuristicIdInput = document.getElementById('heuristicId');
 const titleInput = document.getElementById('title');
 const shortDescriptionInput = document.getElementById('shortDescription');
 const categorySelectionContainer = document.getElementById('categorySelection');
-const newCategoryInput = document.getElementById('newCategory');
-const addCategoryButton = document.getElementById('addCategoryBtn');
+const categoryDropdownBtn = document.getElementById('categoryDropdownBtn');
+const categoryDropdownContent = document.getElementById('categoryDropdownContent');
+const categoryCheckboxes = document.getElementById('categoryCheckboxes');
+const categorySearchInput = document.getElementById('categorySearchInput');
 const iconContainer = document.querySelector('.icon-selection');
 const guidelineInput = document.getElementById('guideline');
 const reasoningTextarea = document.getElementById('reasoning');
@@ -32,14 +34,28 @@ let currentHeuristic = null;
 // Icon-Selector
 let iconSelector = null;
 
+// Alle verfügbaren Kategorien
+let availableCategories = [];
+
 // Editor initialisieren
 function initEditor() {
     // Event-Listener für Editor-Elemente
     heuristicForm.addEventListener('submit', handleFormSubmit);
     cancelButton.addEventListener('click', closeEditor);
     previewButton.addEventListener('click', openPreview);
-    addCategoryButton.addEventListener('click', addNewCategory);
     addExampleButton.addEventListener('click', addExample);
+    
+    // Kategorie-Dropdown-Event-Listener
+    categoryDropdownBtn.addEventListener('click', toggleCategoryDropdown);
+    categorySearchInput.addEventListener('input', filterCategories);
+    
+    // Klick außerhalb des Dropdowns schließt es
+    document.addEventListener('click', (e) => {
+        if (!categoryDropdownBtn.contains(e.target) && 
+            !categoryDropdownContent.contains(e.target)) {
+            categoryDropdownContent.classList.remove('show');
+        }
+    });
     
     // Icon-Selector initialisieren
     initIconSelector();
@@ -67,6 +83,8 @@ function initIconSelector() {
 
 // Öffnet den Editor für eine bestehende oder neue Heuristik
 function openHeuristicEditor(heuristicId = null) {
+    console.log("Opening heuristic editor for ID:", heuristicId);
+    
     // Titel des Modals setzen
     if (heuristicId) {
         modalTitle.textContent = 'Heuristik bearbeiten';
@@ -74,8 +92,14 @@ function openHeuristicEditor(heuristicId = null) {
         modalTitle.textContent = 'Neue Heuristik erstellen';
     }
     
-    // Formular zurücksetzen
+    // Formular zurücksetzen und Event-Handler entfernen
     heuristicForm.reset();
+    
+    // Alte Event-Listener entfernen, um doppelte zu vermeiden
+    guidelineInput.removeEventListener('input', handleGuidelineInput);
+    reasoningTextarea.removeEventListener('input', handleReasoningInput);
+    titleInput.removeEventListener('input', handleTitleInput);
+    shortDescriptionInput.removeEventListener('input', handleShortDescriptionInput);
     
     // Bereiche leeren
     categorySelectionContainer.innerHTML = '';
@@ -87,7 +111,7 @@ function openHeuristicEditor(heuristicId = null) {
         const heuristic = dataManager.getAllHeuristics().find(h => h.id === heuristicId);
         if (heuristic) {
             currentHeuristic = JSON.parse(JSON.stringify(heuristic)); // Deep copy
-            fillFormWithHeuristic(currentHeuristic);
+            console.log("Loaded heuristic:", currentHeuristic);
         } else {
             console.error(`Heuristik mit ID ${heuristicId} nicht gefunden`);
             currentHeuristic = createEmptyHeuristic();
@@ -96,10 +120,20 @@ function openHeuristicEditor(heuristicId = null) {
         currentHeuristic = createEmptyHeuristic();
     }
     
-    // Event-Handler für das Reasoning-Feld hinzufügen
-    reasoningTextarea.addEventListener('input', function() {
-        currentHeuristic.reasoning = this.value;
-    });
+    // Laden aller verfügbaren Kategorien (wichtig: erst nach dem Laden der Heuristikdaten)
+    loadAvailableCategories();
+    
+    // WICHTIG: Erst Formular mit Daten füllen, dann Event-Handler hinzufügen
+    if (heuristicId && currentHeuristic) {
+        console.log("Filling form with heuristic data:", currentHeuristic);
+        fillFormWithHeuristic(currentHeuristic);
+    }
+    
+    // Neue Event-Handler für Eingabefelder hinzufügen
+    guidelineInput.addEventListener('input', handleGuidelineInput);
+    reasoningTextarea.addEventListener('input', handleReasoningInput);
+    titleInput.addEventListener('input', handleTitleInput);
+    shortDescriptionInput.addEventListener('input', handleShortDescriptionInput);
     
     // Icon-Selector mit dem aktuellen Icon aktualisieren
     if (iconSelector) {
@@ -111,6 +145,119 @@ function openHeuristicEditor(heuristicId = null) {
     
     // Modal öffnen
     openModal(heuristicModal);
+}
+
+/**
+ * Lädt alle verfügbaren Kategorien
+ */
+function loadAvailableCategories() {
+    // Kategorien aus allen Heuristiken sammeln
+    const heuristics = dataManager.getAllHeuristics();
+    const categories = new Set();
+    
+    // Extrahiere alle Kategorie-Namen aus den bestehenden Heuristiken
+    heuristics.forEach(heuristic => {
+        if (heuristic.category && Array.isArray(heuristic.category)) {
+            heuristic.category.forEach(category => {
+                if (category && category.trim()) {
+                    categories.add(category.trim());
+                }
+            });
+        }
+    });
+    
+    // Zu Array konvertieren und alphabetisch sortieren
+    availableCategories = Array.from(categories).sort();
+    
+    // Checkboxen erstellen
+    populateCategoryDropdown();
+}
+
+/**
+ * Befüllt den Kategorie-Dropdown mit Checkboxen
+ */
+function populateCategoryDropdown() {
+    categoryCheckboxes.innerHTML = '';
+    
+    // Checkboxen für jede Kategorie erstellen
+    availableCategories.forEach(category => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `category-${category.replace(/\s+/g, '-')}`;
+        checkbox.value = category;
+        checkbox.addEventListener('change', () => handleCategorySelect(category, checkbox.checked));
+        
+        const label = document.createElement('label');
+        label.htmlFor = checkbox.id;
+        label.textContent = category;
+        
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        categoryCheckboxes.appendChild(item);
+    });
+}
+
+/**
+ * Zeigt oder versteckt den Kategorie-Dropdown
+ */
+function toggleCategoryDropdown() {
+    categoryDropdownContent.classList.toggle('show');
+    
+    // Wenn der Dropdown geöffnet wird, fokussiere das Suchfeld
+    if (categoryDropdownContent.classList.contains('show')) {
+        categorySearchInput.focus();
+    }
+}
+
+/**
+ * Filtert die Kategorien im Dropdown basierend auf der Suche
+ */
+function filterCategories() {
+    const searchTerm = categorySearchInput.value.toLowerCase();
+    const dropdownItems = categoryCheckboxes.querySelectorAll('.dropdown-item');
+    
+    dropdownItems.forEach(item => {
+        const label = item.querySelector('label');
+        const text = label.textContent.toLowerCase();
+        
+        if (text.includes(searchTerm)) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+/**
+ * Verarbeitet die Auswahl einer Kategorie
+ */
+function handleCategorySelect(category, isChecked) {
+    // Ensure category array exists
+    if (!currentHeuristic.category) {
+        currentHeuristic.category = [];
+    }
+    
+    if (isChecked) {
+        // Zur aktuellen Heuristik hinzufügen, wenn noch nicht enthalten
+        if (!currentHeuristic.category.includes(category)) {
+            currentHeuristic.category.push(category);
+            addCategoryTag(category);
+        }
+    } else {
+        // Aus der aktuellen Heuristik entfernen
+        currentHeuristic.category = currentHeuristic.category.filter(c => c !== category);
+        
+        // Kategorie-Tag im UI entfernen
+        const categoryTags = categorySelectionContainer.querySelectorAll('.category-tag');
+        categoryTags.forEach(tag => {
+            if (tag.getAttribute('data-category') === category) {
+                categorySelectionContainer.removeChild(tag);
+            }
+        });
+    }
 }
 
 // Erstellt eine leere Heuristik
@@ -128,19 +275,80 @@ function createEmptyHeuristic() {
     };
 }
 
+// Definiere Event-Handler-Funktionen
+function handleGuidelineInput() {
+    currentHeuristic.guideline = this.value;
+}
+
+function handleReasoningInput() {
+    currentHeuristic.reasoning = this.value;
+}
+
+function handleTitleInput() {
+    currentHeuristic.title = this.value;
+}
+
+function handleShortDescriptionInput() {
+    currentHeuristic.shortDescription = this.value;
+}
+
 // Füllt das Formular mit den Daten einer Heuristik
 function fillFormWithHeuristic(heuristic) {
-    // Einfache Felder
+    // Enhanced debug logging
+    console.log("DEBUGGING - Full heuristic object:", {
+        ...heuristic,
+        hasGuideline: 'guideline' in heuristic,
+        hasDescription: 'description' in heuristic,
+        guidelineValue: heuristic.guideline,
+        descriptionValue: heuristic.description,
+        hasExamples: Array.isArray(heuristic.examples),
+        examplesLength: Array.isArray(heuristic.examples) ? heuristic.examples.length : 'N/A',
+        examplesContent: heuristic.examples
+    });
+    
+    console.log("Setting form fields with values:", {
+        id: heuristic.id,
+        title: heuristic.title,
+        shortDescription: heuristic.shortDescription,
+        guideline: heuristic.guideline,
+        reasoning: heuristic.reasoning
+    });
+    
+    // Einfache Felder direkt setzen
     heuristicIdInput.value = heuristic.id || '';
     titleInput.value = heuristic.title || '';
     shortDescriptionInput.value = heuristic.shortDescription || '';
-    guidelineInput.value = heuristic.guideline || '';
+    
+    // Explizit die Textarea-Werte setzen und überprüfen
+    // Fallback: Wenn guideline nicht gesetzt ist, versuche description zu verwenden
+    const guidelineValue = heuristic.guideline || heuristic.description || '';
+    console.log("Guideline value being set:", guidelineValue);
+    guidelineInput.value = guidelineValue;
     reasoningTextarea.value = heuristic.reasoning || '';
+    
+    // Stellen Sie sicher, dass die Werte tatsächlich gesetzt werden (Fallback)
+    setTimeout(() => {
+        if (heuristic.guideline && guidelineInput.value !== heuristic.guideline) {
+            console.log("Manual guideline update needed");
+            document.getElementById('guideline').value = heuristic.guideline;
+        }
+        
+        if (heuristic.reasoning && reasoningTextarea.value !== heuristic.reasoning) {
+            console.log("Manual reasoning update needed");
+            document.getElementById('reasoning').value = heuristic.reasoning;
+        }
+    }, 50);
     
     // Kategorien
     if (heuristic.category && heuristic.category.length > 0) {
         heuristic.category.forEach(category => {
             addCategoryTag(category);
+            
+            // Entsprechende Checkbox ankreuzen
+            const checkbox = document.getElementById(`category-${category.replace(/\s+/g, '-')}`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
         });
     }
     
@@ -149,8 +357,44 @@ function fillFormWithHeuristic(heuristic) {
         iconSelector.setSelectedIcon(heuristic.icon);
     }
     
-    // Beispiele
-    if (heuristic.examples && heuristic.examples.length > 0) {
+    // Debug examples data
+    console.log("DEBUGGING - Examples data:", {
+        hasExamples: !!heuristic.examples,
+        examplesType: heuristic.examples ? typeof heuristic.examples : 'undefined',
+        isArray: Array.isArray(heuristic.examples),
+        length: heuristic.examples ? heuristic.examples.length : 0,
+        content: heuristic.examples
+    });
+    
+    // Ensure examples is always an array
+    if (!heuristic.examples) {
+        heuristic.examples = [];
+        console.log("Created empty examples array");
+    } else if (!Array.isArray(heuristic.examples)) {
+        try {
+            // If examples is a string, try to parse it as JSON
+            if (typeof heuristic.examples === 'string') {
+                const parsed = JSON.parse(heuristic.examples);
+                if (Array.isArray(parsed)) {
+                    heuristic.examples = parsed;
+                    console.log("Parsed examples string into array:", parsed);
+                } else {
+                    heuristic.examples = [];
+                    console.log("Parsed examples is not an array, created empty array");
+                }
+            } else {
+                heuristic.examples = [];
+                console.log("Examples is not a string or array, created empty array");
+            }
+        } catch (error) {
+            console.error("Error parsing examples:", error);
+            heuristic.examples = [];
+        }
+    }
+    
+    // Add examples to form
+    if (heuristic.examples.length > 0) {
+        console.log("Adding examples to form:", heuristic.examples);
         heuristic.examples.forEach((example, index) => {
             addExample(null, example);
         });
@@ -257,26 +501,13 @@ function openPreview() {
     openModal(previewModal);
 }
 
-// Fügt eine neue Kategorie hinzu
-function addNewCategory() {
-    const newCategory = newCategoryInput.value.trim();
-    
-    if (newCategory && !currentHeuristic.category.includes(newCategory)) {
-        // Zur aktuellen Heuristik hinzufügen
-        currentHeuristic.category.push(newCategory);
-        
-        // Tag erstellen
-        addCategoryTag(newCategory);
-        
-        // Eingabefeld leeren
-        newCategoryInput.value = '';
-    }
-}
-
-// Fügt ein Kategorie-Tag zum Container hinzu
+/**
+ * Fügt ein Kategorie-Tag zum Container hinzu
+ */
 function addCategoryTag(category) {
     const tag = document.createElement('div');
     tag.className = 'category-tag';
+    tag.setAttribute('data-category', category);
     tag.innerHTML = `
         ${category}
         <span class="material-icons remove-category">close</span>
@@ -287,6 +518,12 @@ function addCategoryTag(category) {
         // Aus dem Array entfernen
         currentHeuristic.category = currentHeuristic.category.filter(c => c !== category);
         
+        // Zugehörige Checkbox abwählen
+        const checkbox = document.getElementById(`category-${category.replace(/\s+/g, '-')}`);
+        if (checkbox) {
+            checkbox.checked = false;
+        }
+        
         // Tag entfernen
         categorySelectionContainer.removeChild(tag);
     });
@@ -294,7 +531,6 @@ function addCategoryTag(category) {
     // Zum Container hinzufügen
     categorySelectionContainer.appendChild(tag);
 }
-
 
 // Fügt ein Beispiel hinzu
 function addExample(event, existingExample = null) {
@@ -372,8 +608,13 @@ function loadRelatedHeuristics() {
         h.id !== currentHeuristic.id
     );
     
+    // Ensure relatedHeuristics array exists
+    if (!currentHeuristic.relatedHeuristics) {
+        currentHeuristic.relatedHeuristics = [];
+    }
+    
     // Tags für verwandte Heuristiken erstellen
-    if (currentHeuristic.relatedHeuristics && currentHeuristic.relatedHeuristics.length > 0) {
+    if (currentHeuristic.relatedHeuristics.length > 0) {
         currentHeuristic.relatedHeuristics.forEach(relatedId => {
             const relatedHeuristic = allHeuristics.find(h => h.id === relatedId);
             if (relatedHeuristic) {

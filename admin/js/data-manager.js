@@ -444,6 +444,73 @@ class DataManager {
     }
     
     /**
+     * Holt eine Kategorie anhand ihrer ID
+     * @param {string} id Die ID der zu holenden Kategorie
+     * @returns {Object|null} Die Kategorie oder null, wenn nicht gefunden
+     */
+    getCategoryById(id) {
+        return this.categories.find(category => category.id === id) || null;
+    }
+    
+    /**
+     * Zählt, wie oft eine Kategorie in Heuristiken verwendet wird
+     * @param {string} id Die ID der zu prüfenden Kategorie
+     * @returns {number} Die Anzahl der Verwendungen
+     */
+    getCategoryUsageCount(id) {
+        // Kategorie finden
+        const category = this.getCategoryById(id);
+        if (!category) return 0;
+        
+        // Zählen, wie viele Heuristiken diese Kategorie verwenden
+        return this.heuristics.filter(heuristic => 
+            (heuristic.categoryId === id) || 
+            (heuristic.category && heuristic.category.includes(category.name))
+        ).length;
+    }
+    
+    /**
+     * Fügt eine neue Kategorie hinzu
+     * @param {Object} category Die neue Kategorie
+     * @returns {boolean} true bei Erfolg, false bei Fehler
+     */
+    addCategory(category) {
+        // Wenn keine ID vorhanden, generiere eine aus dem Namen
+        if (!category.id && category.name) {
+            category.id = this.generateId(category.name);
+        }
+        
+        try {
+            // Kategorie erstellen
+            this.createCategory(category);
+            return true;
+        } catch(error) {
+            console.error('Fehler beim Hinzufügen der Kategorie:', error);
+            return false;
+        }
+    }
+    
+    /**
+     * Aktualisiert eine bestehende Kategorie
+     * @param {Object} category Die zu aktualisierende Kategorie
+     * @returns {boolean} true bei Erfolg, false bei Fehler
+     */
+    updateCategory(category) {
+        if (!category || !category.id) {
+            return false;
+        }
+        
+        try {
+            // Kategorie aktualisieren
+            this.updateCategory(category.id, category);
+            return true;
+        } catch(error) {
+            console.error(`Fehler beim Aktualisieren der Kategorie ${category.id}:`, error);
+            return false;
+        }
+    }
+    
+    /**
      * Generiert eine ID aus einem Text
      * @param {string} text Der Text, aus dem die ID generiert werden soll
      * @returns {string} Die generierte ID

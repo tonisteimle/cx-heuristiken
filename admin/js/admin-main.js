@@ -154,7 +154,7 @@ function createHeuristicElement(heuristic) {
     element.innerHTML = `
         <div class="heuristic-item-header">
             <div class="heuristic-item-icon">
-                <span class="material-icons">${heuristic.icon || 'help'}</span>
+                <span class="material-icons">${heuristic.icon && heuristic.icon !== 'undefined' ? heuristic.icon : 'help'}</span>
             </div>
             <h3 class="heuristic-item-title">${heuristic.title}</h3>
         </div>

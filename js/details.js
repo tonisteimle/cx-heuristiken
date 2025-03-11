@@ -24,17 +24,20 @@ function init() {
         .catch(error => {
             console.error('Fehler beim Laden der Daten:', error);
             
-            // Notfall-Fallback auf lokale Daten
-            const data = getHardcodedData();
-            const heuristic = data.heuristics.find(h => h.id === heuristicId);
-            
-            if (heuristic) {
-                const relatedHeuristics = getRelatedHeuristics(heuristic, data.heuristics);
-                renderHeuristicDetails(heuristic);
-                renderRelatedHeuristics(relatedHeuristics);
-            } else {
-                showError('Die gesuchte Heuristik wurde nicht gefunden.');
-            }
+            // Fallback auf lokale JSON-Datei
+            loadDataFromLocalFile(heuristicId)
+                .then(data => {
+                    if (data.heuristic) {
+                        renderHeuristicDetails(data.heuristic);
+                        renderRelatedHeuristics(data.relatedHeuristics);
+                    } else {
+                        showError('Die gesuchte Heuristik wurde nicht gefunden.');
+                    }
+                })
+                .catch(localError => {
+                    console.error('Fehler beim Laden der lokalen Daten:', localError);
+                    showError('Die Heuristik konnte nicht geladen werden.');
+                });
         });
 }
 
@@ -74,85 +77,55 @@ function loadDataFromAPI(heuristicId) {
         });
 }
 
-// Fallback: Load hardcoded data if API fails
-function getHardcodedData() {
-    // Use the same function as in main.js to ensure consistency
-    if (typeof window.getHardcodedData === 'function') {
-        return window.getHardcodedData();
-    }
-    
-    // Define it here as fallback if main.js is not loaded
-    return {
-        "heuristics": [
-            {
-                "id": "recognition-vs-recall",
-                "title": "Erkennen statt Erinnern",
-                "shortDescription": "Informationen sollten fur Nutzer sichtbar oder leicht zuganglich sein.",
-                "category": ["Gedachtnisbelastung", "Kognitive Ergonomie"],
-                "icon": "psychology",
-                "guideline": "Informationen sollten sichtbar oder leicht zuganglich sein, anstatt von ihnen zu verlangen, sich an Details zu erinnern.",
-                "reasoning": "Das Prinzip Erkennen statt Erinnern fordert, die Gedachtnisbelastung der Nutzer so gering wie moglich zu halten.",
-                "examples": [
-                    {
-                        "title": "E-Commerce",
-                        "description": "Online-Shopping-Plattformen setzen auf Wiedererkennungshilfen."
-                    },
-                    {
-                        "title": "Software/UI",
-                        "description": "Gut gestaltete Anwendungen prasentieren alle notigen Funktionen und Aktionen sichtbar im Menu oder Dashboard."
-                    }
-                ],
-                "relatedHeuristics": ["consistency-standards", "error-prevention"]
-            },
-            {
-                "id": "consistency-standards",
-                "title": "Konsistenz und Standards",
-                "shortDescription": "Folge Konventionen und halte Elemente uber die gesamte Anwendung hinweg konsistent.",
-                "category": ["Konsistenz", "Erlernbarkeit"],
-                "icon": "format_align_center",
-                "guideline": "Folge etablierten Konventionen und halte Elemente uber die gesamte Anwendung hinweg konsistent.",
-                "reasoning": "Konsistenz in der Benutzeroberflache reduziert den Lernaufwand erheblich und macht die Interaktion vorhersehbarer.",
-                "examples": [
-                    {
-                        "title": "Benutzeroberflache",
-                        "description": "Konsistentes Design zeigt sich in der durchgangigen Verwendung von UI-Elementen."
-                    },
-                    {
-                        "title": "Navigation",
-                        "description": "Navigationsmenos sollten an konsistenten Positionen bleiben und einheitlich strukturiert sein."
-                    }
-                ],
-                "relatedHeuristics": ["recognition-vs-recall", "error-prevention"]
-            },
-            {
-                "id": "error-prevention",
-                "title": "Fehlerpravention",
-                "shortDescription": "Vermeide Fehler durch sorgfaltiges Design, bevor sie auftreten.",
-                "category": ["Fehlermanagement", "Benutzerfuhrung"],
-                "icon": "error_outline",
-                "guideline": "Gestalte Systeme so, dass Fehler von vornherein vermieden werden.",
-                "reasoning": "Fehlerpravention ist effektiver als Fehlerbehebung.",
-                "examples": [
-                    {
-                        "title": "Formulardesign",
-                        "description": "Gute Formulare bieten klare Anweisungen und validieren Eingaben wahrend der Eingabe."
-                    },
-                    {
-                        "title": "Interaktionsdesign",
-                        "description": "Destruktive Aktionen werden von haufig genutzten Funktionen raumlich getrennt."
-                    }
-                ],
-                "relatedHeuristics": ["recognition-vs-recall", "consistency-standards"]
+// Load data from local file
+function loadDataFromLocalFile(heuristicId) {
+    return fetch('data/heuristics.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Lokale JSON-Datei konnte nicht geladen werden');
             }
-        ]
-    };
-}
-
-// Get related heuristics from the local data
-function getRelatedHeuristics(heuristic, allHeuristics) {
-    if (!heuristic.relatedHeuristics || !allHeuristics) return [];
-    
-    return allHeuristics.filter(h => heuristic.relatedHeuristics.includes(h.id));
+            return response.json();
+        })
+        .then(data => {
+            // Flattened list of all heuristics from all categories
+            const allHeuristics = [];
+            
+            if (data.categories) {
+                data.categories.forEach(category => {
+                    if (category.heuristics && Array.isArray(category.heuristics)) {
+                        category.heuristics.forEach(heuristic => {
+                            // Add category information to the heuristic
+                            allHeuristics.push({
+                                ...heuristic,
+                                categoryId: category.id,
+                                categoryName: category.name,
+                                icon: heuristic.icon || category.icon
+                            });
+                        });
+                    }
+                });
+            }
+            
+            // Find the requested heuristic
+            const heuristic = allHeuristics.find(h => h.id === heuristicId);
+            
+            if (!heuristic) {
+                return { heuristic: null, relatedHeuristics: [] };
+            }
+            
+            // Find related heuristics
+            let relatedHeuristics = [];
+            if (heuristic.relatedHeuristics) {
+                relatedHeuristics = allHeuristics.filter(h => 
+                    heuristic.relatedHeuristics.includes(h.id)
+                );
+            }
+            
+            return {
+                heuristic: heuristic,
+                relatedHeuristics: relatedHeuristics
+            };
+        });
 }
 
 // Render the heuristic details
@@ -180,20 +153,34 @@ function renderHeuristicDetails(heuristic) {
         heuristic.category.forEach(category => {
             categoryTags += `<span class="category-tag">${category}</span>`;
         });
+    } else if (heuristic.categoryName) {
+        // Fallback to categoryName if available
+        categoryTags = `<span class="category-tag">${heuristic.categoryName}</span>`;
     }
     
     // Create examples HTML
     let examplesHTML = '';
     if (heuristic.examples && heuristic.examples.length > 0) {
+        examplesHTML = '<ul class="examples-list">';
         heuristic.examples.forEach(example => {
-            examplesHTML += `
-                <div class="example">
-                    <h3>${example.title}</h3>
-                    <p>${example.description}</p>
-                </div>
-            `;
+            if (typeof example === 'string') {
+                // Handle plain string examples
+                examplesHTML += `<li>${example}</li>`;
+            } else if (example.title && example.description) {
+                // Handle object examples with title and description
+                examplesHTML += `
+                    <li>
+                        <strong>${example.title}:</strong> ${example.description}
+                    </li>
+                `;
+            }
         });
+        examplesHTML += '</ul>';
     }
+    
+    // Determine content for guidelines and reasoning sections
+    const guideline = heuristic.guideline || heuristic.description || '';
+    const reasoning = heuristic.reasoning || '';
     
     // Create complete HTML for the detail container
     detailContainer.innerHTML = `
@@ -202,22 +189,26 @@ function renderHeuristicDetails(heuristic) {
                 <span class="material-icons">${heuristic.icon || 'help'}</span>
             </div>
             <h1>${heuristic.title}</h1>
-            <p>${heuristic.shortDescription}</p>
+            <p>${heuristic.shortDescription || ''}</p>
             <div class="categories">${categoryTags}</div>
         </div>
         <div class="heuristic-detail-content">
             <section>
                 <h2>Guideline</h2>
-                <div class="guideline">${heuristic.guideline}</div>
+                <div class="guideline">${guideline}</div>
             </section>
-            <section>
-                <h2>Begründung</h2>
-                <div class="reasoning">${heuristic.reasoning}</div>
-            </section>
-            <section>
-                <h2>Beispiele</h2>
-                <div class="examples">${examplesHTML}</div>
-            </section>
+            ${reasoning ? `
+                <section>
+                    <h2>Begründung</h2>
+                    <div class="reasoning">${reasoning}</div>
+                </section>
+            ` : ''}
+            ${examplesHTML ? `
+                <section>
+                    <h2>Beispiele</h2>
+                    <div class="examples">${examplesHTML}</div>
+                </section>
+            ` : ''}
         </div>
     `;
     
@@ -247,26 +238,31 @@ function renderRelatedHeuristics(relatedHeuristics) {
         const card = document.createElement('div');
         card.classList.add('heuristic-card');
         
-        // Create category tags HTML
-        let categoryTags = '';
-        if (heuristic.category && heuristic.category.length > 0) {
-            heuristic.category.forEach(category => {
-                categoryTags += `<span class="category-tag">${category}</span>`;
-            });
+        // Create category tag
+        let categoryTag = '';
+        if (heuristic.categoryName) {
+            categoryTag = `<span class="category-tag">${heuristic.categoryName}</span>`;
+        } else if (heuristic.category && heuristic.category.length > 0) {
+            categoryTag = `<span class="category-tag">${heuristic.category[0]}</span>`;
         }
         
-        // Use the exact same HTML structure as in main.js for consistency
+        // Use the description field for display if shortDescription is not available
+        const displayDescription = heuristic.shortDescription || heuristic.description || '';
+        
+        // Create material icon or use a default if not available
+        const iconName = heuristic.icon || 'help';
+        
         card.innerHTML = 
-            '<div class="heuristic-card-icon">' +
-            '<span class="material-icons">' + heuristic.icon + '</span>' +
+            '<div class="heuristic-icon">' +
+            '<span class="material-icons">' + iconName + '</span>' +
             '</div>' +
             '<h3>' + heuristic.title + '</h3>' +
-            '<p>' + heuristic.shortDescription + '</p>' +
-            '<div class="categories">' + categoryTags + '</div>';
+            '<p>' + displayDescription + '</p>' +
+            '<div class="categories">' + categoryTag + '</div>';
         
-        // Add click event
+        // Add click event to navigate to detail page
         card.addEventListener('click', () => {
-            window.location.href = `details.html?id=${heuristic.id}`;
+            window.location.href = 'details.html?id=' + heuristic.id;
         });
         
         relatedContainer.appendChild(card);

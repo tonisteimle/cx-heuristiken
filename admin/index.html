@@ -90,13 +90,21 @@
                     <div class="form-group">
                         <label for="category">Kategorien</label>
                         <div class="category-selection" id="categorySelection">
-                            <!-- Kategorien werden dynamisch hinzugefügt -->
+                            <!-- Ausgewählte Kategorien werden als Tags angezeigt -->
                         </div>
-                        <div class="new-category-input">
-                            <input type="text" id="newCategory" placeholder="Neue Kategorie hinzufügen...">
-                            <button type="button" id="addCategoryBtn" class="icon-button">
-                                <span class="material-icons">add</span>
+                        <div class="category-dropdown-container">
+                            <button type="button" id="categoryDropdownBtn" class="dropdown-button">
+                                <span>Kategorien auswählen</span>
+                                <span class="material-icons">arrow_drop_down</span>
                             </button>
+                            <div class="category-dropdown-content" id="categoryDropdownContent">
+                                <div class="dropdown-search">
+                                    <input type="text" id="categorySearchInput" placeholder="Kategorien suchen...">
+                                </div>
+                                <div class="dropdown-items" id="categoryCheckboxes">
+                                    <!-- Checkboxen werden dynamisch hinzugefügt -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                     

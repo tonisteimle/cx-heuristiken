@@ -1,0 +1,103 @@
+{
+  "categories": [
+    {
+      "id": "feedback-communication",
+      "name": "Feedback & Kommunikation",
+      "icon": "feedback",
+      "description": "Heuristiken zur klaren Kommunikation zwischen System und Benutzer",
+      "heuristics": [
+        {
+          "id": "system-status",
+          "title": "Systemstatus klar kommunizieren",
+          "description": "Das System sollte den Benutzer immer über den aktuellen Status informieren, durch angemessenes Feedback innerhalb einer angemessenen Zeit.",
+          "examples": [
+            "Ladebalken zeigen Fortschritt bei zeitintensiven Operationen",
+            "Farbliche Kennzeichnung von Formularfeldern mit Validierungsfehlern",
+            "Bestätigungsnachrichten nach erfolgreicher Aktion"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "interaction-design",
+      "name": "Interaktionsdesign",
+      "icon": "touch_app",
+      "description": "Heuristiken zur Verbesserung der Interaktion zwischen Benutzern und Interfaces",
+      "heuristics": [
+        {
+          "id": "consistency-standards",
+          "title": "Konsistenz und Standards einhalten",
+          "description": "Benutzer sollten sich nicht fragen müssen, ob verschiedene Wörter, Situationen oder Aktionen dasselbe bedeuten. Folgen Sie Plattformkonventionen.",
+          "examples": [
+            "Konsistente Terminologie in der gesamten Anwendung",
+            "Einheitliches Farbschema für interaktive Elemente",
+            "Standardisierte Positionierung von Navigationselementen"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "accessibility",
+      "name": "Barrierefreiheit",
+      "icon": "accessibility",
+      "description": "Heuristiken zur Sicherstellung der Zugänglichkeit für alle Benutzer, unabhängig von ihren Fähigkeiten",
+      "heuristics": [
+        {
+          "id": "color-contrast",
+          "title": "Ausreichenden Farbkontrast bieten",
+          "description": "Text und interaktive Elemente sollten einen ausreichenden Kontrast zur Hintergrundfarbe aufweisen, um für Benutzer mit Sehbehinderungen lesbar zu sein.",
+          "examples": [
+            "Kontrastrate von mindestens 4,5:1 für normalen Text",
+            "Dunkler Text auf hellem Hintergrund oder umgekehrt",
+            "Keine Informationsvermittlung ausschließlich durch Farbe"
+          ]
+        },
+        {
+          "id": "keyboard-accessibility",
+          "title": "Tastaturzugänglichkeit sicherstellen",
+          "description": "Alle Funktionen sollten über die Tastatur zugänglich sein, ohne dass spezifische Timing-Anforderungen für einzelne Tastenanschläge erforderlich sind.",
+          "examples": [
+            "Fokus-Indikatoren für alle interaktiven Elemente",
+            "Logische Tab-Reihenfolge durch das Interface",
+            "Keine Funktionen, die ausschließlich bei Hover oder Mausklick funktionieren"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "visual-design",
+      "name": "Visuelles Design",
+      "icon": "palette",
+      "description": "Heuristiken zur visuellen Gestaltung und ästhetischen Kommunikation",
+      "heuristics": []
+    },
+    {
+      "id": "user-control",
+      "name": "Benutzerkontrolle",
+      "icon": "settings",
+      "description": "Heuristiken, die Benutzern Kontrolle und Freiheit in ihrer Erfahrung geben",
+      "heuristics": []
+    },
+    {
+      "id": "error-management",
+      "name": "Fehlerprävention & -behebung",
+      "icon": "error_outline",
+      "description": "Heuristiken, die Benutzer beim Vermeiden und Beheben von Fehlern unterstützen",
+      "heuristics": []
+    },
+    {
+      "id": "cognitive-load",
+      "name": "Kognitive Belastung",
+      "icon": "psychology",
+      "description": "Heuristiken zur Minimierung der mentalen Anstrengung bei der Nutzung des Systems",
+      "heuristics": []
+    },
+    {
+      "id": "information-architecture",
+      "name": "Informationsarchitektur",
+      "icon": "account_tree",
+      "description": "Heuristiken zur Organisation und Strukturierung von Inhalten",
+      "heuristics": []
+    }
+  ]
+}

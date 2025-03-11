@@ -1,103 +1,226 @@
 {
   "categories": [
     {
-      "id": "feedback-communication",
-      "name": "Feedback & Kommunikation",
-      "icon": "feedback",
-      "description": "Heuristiken zur klaren Kommunikation zwischen System und Benutzer",
+      "id": "transparency-orientation",
+      "name": "Transparenz & Orientierung",
+      "icon": "explore",
+      "description": "Heuristiken, die sicherstellen, dass Benutzer jederzeit über ihren aktuellen Standort im Prozess informiert sind und eine klare Übersicht über den weiteren Ablauf haben.",
       "heuristics": [
         {
-          "id": "system-status",
-          "title": "Systemstatus klar kommunizieren",
-          "description": "Das System sollte den Benutzer immer über den aktuellen Status informieren, durch angemessenes Feedback innerhalb einer angemessenen Zeit.",
+          "id": "clear-orientation",
+          "title": "Orientierung durch klare Information",
+          "icon": "explore",
+          "shortDescription": "Benutzer sollten jederzeit wissen, wo sie sich im Prozess befinden.",
+          "description": "Kunden sollten jederzeit klar erkennen können, wo im Gesamtprozess sie sich befinden. Jede Phase der Customer Journey muss transparent kommuniziert werden, damit der Nutzer ein mentales Modell der Abläufe entwickeln kann.",
+          "reasoning": "Ein transparenter und gut strukturierter Prozess gibt Nutzern Sicherheit und Orientierung. Dadurch entsteht das Gefühl, den Prozess souverän zu durchschauen und unter Kontrolle zu haben. Dies reduziert Frustration und Abbrüche.",
           "examples": [
-            "Ladebalken zeigen Fortschritt bei zeitintensiven Operationen",
-            "Farbliche Kennzeichnung von Formularfeldern mit Validierungsfehlern",
-            "Bestätigungsnachrichten nach erfolgreicher Aktion"
-          ]
+            {
+              "title": "Fortschrittsbalken",
+              "description": "Fortschrittsbalken in Checkout-Prozessen, z. B. \"Schritt 2 von 4\", die den aktuellen Fortschritt verdeutlichen."
+            },
+            {
+              "title": "Statusmeldungen",
+              "description": "Regelmäßige Zwischenmeldungen in mehrstufigen Formularen, z. B. \"Ihre Adresse wurde gespeichert. Als Nächstes: Zahlungsinformationen.\""
+            },
+            {
+              "title": "Testbeispiel",
+              "description": "Test"
+            }
+          ],
+          "category": [
+            "Transparenz & Orientierung"
+          ],
+          "relatedHeuristics": []
+        },
+        {
+          "id": "process-status",
+          "title": "Klare Prozessführung mit laufenden Statusmeldungen",
+          "icon": "info",
+          "shortDescription": "Laufende Statusupdates geben dem Benutzer jederzeit Rückmeldung über den Fortschritt.",
+          "description": "Eine kontinuierliche Kommunikation des aktuellen Status – beispielsweise durch Statusmeldungen bei der Bearbeitung einer Anfrage oder beim Versand eines Produkts – vermittelt dem Kunden Sicherheit.",
+          "reasoning": "Regelmäßige Statusmeldungen verhindern das Gefühl, im Unklaren gelassen zu werden, und reduzieren Nachfragen, weil der Kunde stets weiß, was als Nächstes geschieht. Dies stärkt das Vertrauen in den Anbieter und gibt dem Nutzer ein Gefühl der Kontrolle.",
+          "examples": [
+            {
+              "title": "Beispieltitel 1",
+              "description": "Beispielbeschreibung 1"
+            }
+          ],
+          "category": [
+            "Transparenz & Orientierung"
+          ],
+          "relatedHeuristics": []
         }
       ]
     },
     {
-      "id": "interaction-design",
-      "name": "Interaktionsdesign",
-      "icon": "touch_app",
-      "description": "Heuristiken zur Verbesserung der Interaktion zwischen Benutzern und Interfaces",
+      "id": "interaction-process-design",
+      "name": "Interaktions- & Prozessdesign",
+      "icon": "alt_route",
+      "description": "Heuristiken, die benutzerfreundliche, flexible und gut strukturierte Abläufe sicherstellen.",
       "heuristics": [
         {
-          "id": "consistency-standards",
-          "title": "Konsistenz und Standards einhalten",
-          "description": "Benutzer sollten sich nicht fragen müssen, ob verschiedene Wörter, Situationen oder Aktionen dasselbe bedeuten. Folgen Sie Plattformkonventionen.",
+          "id": "overview-details",
+          "title": "Überblick und Details gleichzeitig sehen",
+          "icon": "splitscreen",
+          "shortDescription": "Sowohl der Gesamtüberblick als auch detaillierte Informationen sollten zugänglich sein.",
+          "description": "Informationen in der Customer Journey sollten so aufbereitet sein, dass der Benutzer den Gesamtüberblick behält und bei Bedarf in die Tiefe gehen kann.",
+          "reasoning": "Eine gut gestaltete Balance zwischen Überblick und Details verhindert, dass der Nutzer zwischen verschiedenen Darstellungsformen wechseln muss, und bewahrt den Kontext. Dies reduziert die kognitive Belastung und verbessert die Benutzerfreundlichkeit erheblich.",
           "examples": [
-            "Konsistente Terminologie in der gesamten Anwendung",
-            "Einheitliches Farbschema für interaktive Elemente",
-            "Standardisierte Positionierung von Navigationselementen"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "accessibility",
-      "name": "Barrierefreiheit",
-      "icon": "accessibility",
-      "description": "Heuristiken zur Sicherstellung der Zugänglichkeit für alle Benutzer, unabhängig von ihren Fähigkeiten",
-      "heuristics": [
-        {
-          "id": "color-contrast",
-          "title": "Ausreichenden Farbkontrast bieten",
-          "description": "Text und interaktive Elemente sollten einen ausreichenden Kontrast zur Hintergrundfarbe aufweisen, um für Benutzer mit Sehbehinderungen lesbar zu sein.",
-          "examples": [
-            "Kontrastrate von mindestens 4,5:1 für normalen Text",
-            "Dunkler Text auf hellem Hintergrund oder umgekehrt",
-            "Keine Informationsvermittlung ausschließlich durch Farbe"
+            "E-Mail-Clients, die eine Liste der Nachrichten und eine Vorschau der ausgewählten Nachricht nebeneinander anzeigen",
+            "Dashboards, die sowohl Kennzahlen als auch detaillierte Diagramme parallel darstellen",
+            "PDF-Viewer mit Thumbnail-Übersicht neben der vergrößerten Seitenansicht"
           ]
         },
         {
-          "id": "keyboard-accessibility",
-          "title": "Tastaturzugänglichkeit sicherstellen",
-          "description": "Alle Funktionen sollten über die Tastatur zugänglich sein, ohne dass spezifische Timing-Anforderungen für einzelne Tastenanschläge erforderlich sind.",
+          "id": "autonomy-process",
+          "title": "Autonomiefördernde Prozessgestaltung",
+          "icon": "alt_route",
+          "shortDescription": "Benutzer sollten Prozesse nach eigenem Tempo und Wunsch steuern können.",
+          "description": "Kunden sollten in jeder Phase der Customer Journey das Gefühl haben, das Steuer in der Hand zu halten. Dies beinhaltet die Möglichkeit, optionale Schritte zu überspringen, den Prozess zu pausieren und später fortzusetzen oder in eigener Reihenfolge vorzugehen.",
+          "reasoning": "Flexibilität und Kontrolle über den Prozess stärken die Selbstwirksamkeit und reduzieren Stress. Nutzer fühlen sich nicht in einen vorgegebenen Ablauf gezwungen, sondern können ihren eigenen Weg wählen, was die Zufriedenheit erhöht und Abbrüche verringert.",
           "examples": [
-            "Fokus-Indikatoren für alle interaktiven Elemente",
-            "Logische Tab-Reihenfolge durch das Interface",
-            "Keine Funktionen, die ausschließlich bei Hover oder Mausklick funktionieren"
+            "Mehrstufige Formulare mit der Möglichkeit, vor- und zurückzuspringen",
+            "Optionen, einen Registrierungsschritt zu überspringen und als Gast fortzufahren",
+            "Speicher- und Wiederaufnahmemechanismen in Online-Anträgen"
+          ]
+        },
+        {
+          "id": "proactive-change",
+          "title": "Proaktives Änderungs- und Verlängerungsmanagement",
+          "icon": "update",
+          "shortDescription": "Änderungen und Verlängerungen sollten frühzeitig und proaktiv kommuniziert werden.",
+          "description": "Kunden sollten über bevorstehende Änderungen, Vertragsverlängerungen oder Aktualisierungen frühzeitig informiert werden. Durch proaktive Kommunikation wird sichergestellt, dass der Kunde genügend Zeit hat, sich vorzubereiten und Entscheidungen zu treffen.",
+          "reasoning": "Die frühzeitige Information stärkt das Gefühl der Kontrolle und verhindert unangenehme Überraschungen. Kunden fühlen sich ernst genommen und wertgeschätzt, wenn sie nicht vor vollendete Tatsachen gestellt werden. Dies fördert langfristiges Vertrauen und Kundenbindung.",
+          "examples": [
+            "Automatisierte Erinnerungen vor Ablauf eines Abonnements",
+            "Frühzeitige Benachrichtigungen über Preisänderungen mit klarer Darstellung der Gründe und Alternativen",
+            "E-Mail-Kampagnen, die den Kunden Optionen zur Anpassung seines Vertrags bieten"
           ]
         }
       ]
     },
     {
-      "id": "visual-design",
-      "name": "Visuelles Design",
-      "icon": "palette",
-      "description": "Heuristiken zur visuellen Gestaltung und ästhetischen Kommunikation",
-      "heuristics": []
+      "id": "communication-framing",
+      "name": "Kommunikation & Framing",
+      "icon": "thumb_up",
+      "description": "Heuristiken, die eine positive und lösungsorientierte Kommunikation fördern.",
+      "heuristics": [
+        {
+          "id": "positive-framing",
+          "title": "Positive Framing-Strategie",
+          "icon": "thumb_up",
+          "shortDescription": "Informationen sollten stets optimistisch und lösungsorientiert formuliert sein.",
+          "description": "Die Kommunikation entlang der Customer Journey sollte konsequent auf positive Aspekte und erreichbare Gewinne ausgerichtet sein – anstatt auf Ängste oder Risiken.",
+          "reasoning": "Eine optimistisch formulierte Botschaft motiviert den Benutzer und stärkt das Vertrauen, da sie die Vorteile und den Mehrwert einer Entscheidung in den Vordergrund stellt. Psychologische Studien zeigen, dass positives Framing zu höherer Nutzerzufriedenheit und besseren Konversionsraten führt.",
+          "examples": [
+            "Marketingtexte, die Erfolge und Ersparnisse hervorheben, z. B. \"Sie sparen jeden Monat X Euro\"",
+            "Positiv formulierte Fehlermeldungen, die nicht nur auf ein Problem hinweisen, sondern auch Lösungsschritte anbieten",
+            "Produktbeschreibungen, die den Mehrwert und die zukünftigen Vorteile betonen"
+          ]
+        },
+        {
+          "id": "value-communication",
+          "title": "Wertorientierte Rechnungskommunikation",
+          "icon": "attach_money",
+          "shortDescription": "Rechnungen sollten den Nutzen vor den Kosten kommunizieren.",
+          "description": "Bei der Darstellung von Kosten sollte der Nutzen der erbrachten Leistungen in den Vordergrund gestellt werden. Anstatt dem Kunden nur eine Zahlenaufstellung zu präsentieren, wird zunächst der Mehrwert sichtbar gemacht, den er für sein Geld erhält.",
+          "reasoning": "Durch die Betonung des Wertes vor den Kosten wird die Zahlungsbereitschaft erhöht und das Preisempfinden positiv beeinflusst. Dies sorgt für ein besseres Gefühl beim Zahlen und stärkt die Kundenbindung, da der Kunde den erhaltenen Gegenwert klar erkennt.",
+          "examples": [
+            "Rechnungen, die oben eine Zusammenfassung der erbrachten Leistungen zeigen, bevor die Kosten aufgelistet werden",
+            "E-Mail-Rechnungen, die den Nutzen der erbrachten Services betonen, z. B. \"Ihr Service sichert Ihnen 100% Systemverfügbarkeit\"",
+            "Infokästen auf Rechnungen, die kurz und prägnant den Mehrwert darstellen"
+          ]
+        }
+      ]
     },
     {
-      "id": "user-control",
-      "name": "Benutzerkontrolle",
-      "icon": "settings",
-      "description": "Heuristiken, die Benutzern Kontrolle und Freiheit in ihrer Erfahrung geben",
-      "heuristics": []
+      "id": "information-cognitive",
+      "name": "Informationsaufbereitung & kognitive Entlastung",
+      "icon": "summarize",
+      "description": "Heuristiken, die Inhalte klar strukturieren und die kognitive Belastung der Benutzer minimieren.",
+      "heuristics": [
+        {
+          "id": "cognitive-recap",
+          "title": "Kognitive Entlastung durch systematische Rekapitulation",
+          "icon": "summarize",
+          "shortDescription": "Wichtige Informationen sollten regelmäßig zusammengefasst werden.",
+          "description": "Durch wiederholte Zusammenfassungen der wesentlichen Informationen wird das Arbeitsgedächtnis des Benutzers entlastet.",
+          "reasoning": "Regelmäßige Rekapitulationen helfen dem Nutzer, den Überblick über den bisherigen Verlauf zu behalten, ohne sich alles merken zu müssen. Dies reduziert die kognitive Belastung und ermöglicht es dem Nutzer, sich besser auf den nächsten Schritt zu konzentrieren, was zu weniger Fehlern und höherer Zufriedenheit führt.",
+          "examples": [
+            "Zusammenfassende Übersichten am Ende eines mehrstufigen Formulars",
+            "Regelmäßige Status-E-Mails, die den bisherigen Verlauf eines Prozesses zusammenfassen",
+            "Dashboard-Elemente, die ausgewählte Informationen dauerhaft anzeigen"
+          ]
+        },
+        {
+          "id": "modular-configuration",
+          "title": "Modulare Produktkonfiguration mit adaptiver Komplexität",
+          "icon": "view_module",
+          "shortDescription": "Komplexe Angebote sollten in überschaubare Module unterteilt werden.",
+          "description": "Statt den Benutzer sofort mit der vollen Komplexität eines Angebots zu konfrontieren, wird das Angebot in Module unterteilt. So kann der Kunde zunächst eine Basisversion wählen und bei Bedarf schrittweise weitere Details abrufen.",
+          "reasoning": "Die schrittweise Erhöhung der Komplexität reduziert Überforderung und unterstützt eine zielgerichtete Entscheidungsfindung. Nutzer können sich auf jeweils einen Aspekt konzentrieren und fühlen sich nicht von Optionen und Entscheidungen überfordert, was zu besseren und zufriedenstellenderen Entscheidungen führt.",
+          "examples": [
+            "Online-Konfiguratoren, bei denen zuerst nur die Grundfunktionen angezeigt und erweiterte Optionen per Klick einblendbar sind",
+            "Schrittweise Auswahlprozesse in der Produktauswahl, bei denen zusätzliche Funktionen als optionale Module hinzugefügt werden können",
+            "Apps, die einen Basis-Setup-Modus und einen Expertenmodus anbieten"
+          ]
+        }
+      ]
     },
     {
-      "id": "error-management",
-      "name": "Fehlerprävention & -behebung",
-      "icon": "error_outline",
-      "description": "Heuristiken, die Benutzer beim Vermeiden und Beheben von Fehlern unterstützen",
-      "heuristics": []
+      "id": "trust-empathy",
+      "name": "Vertrauensbildung & emotionale Unterstützung",
+      "icon": "favorite",
+      "description": "Heuristiken, die das Vertrauen der Benutzer stärken und emotionale Unterstützung bieten.",
+      "heuristics": [
+        {
+          "id": "tangible-service",
+          "title": "Greifbare Leistungen",
+          "icon": "touch_app",
+          "shortDescription": "Abstrakte Services sollten durch physische oder visuelle Elemente konkret erfahrbar gemacht werden.",
+          "description": "Immaterielle Leistungen werden greifbarer, wenn sie mit physischen oder visuellen Elementen verknüpft werden.",
+          "reasoning": "Visualisierungen und physische Artefakte schaffen Anker, an denen der Benutzer den Mehrwert der Dienstleistung erkennen und emotional verankern kann. Dies erhöht die Wertschätzung für abstrakte Leistungen und macht sie für den Kunden fassbarer und bedeutungsvoller.",
+          "examples": [
+            "Versand einer persönlichen Willkommensbox nach Vertragsabschluss",
+            "Digitale Zertifikate oder Abzeichen, die den Service bestätigen",
+            "Visuelle Darstellungen von Leistungsdaten, z. B. in Form von ansprechenden Dashboards"
+          ]
+        },
+        {
+          "id": "emotional-support",
+          "title": "Emotionale Unterstützung im Problemfall",
+          "icon": "sentiment_satisfied",
+          "shortDescription": "In Krisensituationen sollte empathisch reagiert werden, bevor sachliche Lösungen präsentiert werden.",
+          "description": "Befindet sich ein Kunde in einer belastenden Situation, ist es entscheidend, dass er empathisch unterstützt wird. Einfühlsame Kommunikation und persönliche Betreuung schaffen Vertrauen und mindern den Stress.",
+          "reasoning": "Menschen in Stresssituationen benötigen zunächst emotionale Unterstützung, bevor sie für sachliche Lösungen aufnahmebereit sind. Die Anerkennung der Gefühle des Kunden baut Vertrauen auf und legt die Grundlage für eine konstruktive Problemlösung. Dies führt zu höherer Kundenzufriedenheit auch in schwierigen Situationen.",
+          "examples": [
+            "Sofortige persönliche Kontaktaufnahme nach einer Beschwerde oder Reklamation",
+            "Empathisch formulierte E-Mails, die das Verständnis für die Situation des Kunden ausdrücken",
+            "Direkte Zuordnung eines persönlichen Ansprechpartners in Support-Fällen"
+          ]
+        }
+      ]
     },
     {
-      "id": "cognitive-load",
-      "name": "Kognitive Belastung",
-      "icon": "psychology",
-      "description": "Heuristiken zur Minimierung der mentalen Anstrengung bei der Nutzung des Systems",
-      "heuristics": []
-    },
-    {
-      "id": "information-architecture",
-      "name": "Informationsarchitektur",
-      "icon": "account_tree",
-      "description": "Heuristiken zur Organisation und Strukturierung von Inhalten",
-      "heuristics": []
+      "id": "accessibility-reidentification",
+      "name": "Barrierefreiheit & Re-Identifikation",
+      "icon": "keyboard",
+      "description": "Heuristiken, die einen barrierefreien Zugang und einen nahtlosen Wiedereinstieg in unterbrochene Prozesse sicherstellen.",
+      "heuristics": [
+        {
+          "id": "seamless-reentry",
+          "title": "Barrierefreie Re-Identifikation und nahtloser Wiedereinstieg",
+          "icon": "login",
+          "shortDescription": "Benutzer sollten Prozesse problemlos unterbrechen und später wieder aufnehmen können.",
+          "description": "Nach einer Unterbrechung muss es dem Benutzer leichtfallen, den Prozess an genau der Stelle fortzusetzen, an der er aufgehört hat.",
+          "reasoning": "Die Möglichkeit, Prozesse zu unterbrechen und nahtlos fortzusetzen, entspricht dem realen Nutzungsverhalten und reduziert Frustration. Dies erfordert technische und organisatorische Maßnahmen, um den Wiederanmeldeprozess und die Wiederherstellung des bisherigen Zustands so barrierefrei wie möglich zu gestalten. Eine gute Wiedereinstiegserfahrung führt zu höherer Abschlussrate bei komplexen Prozessen.",
+          "examples": [
+            "Funktion 'Speichern und später fortsetzen' in Online-Formularen",
+            "Ein-Klick-Login oder biometrische Authentifizierung zur schnellen Wiederaufnahme",
+            "Automatisch gespeicherte Sitzungsdaten, die beim erneuten Login direkt angezeigt werden"
+          ]
+        }
+      ]
     }
   ]
 }

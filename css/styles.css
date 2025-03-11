@@ -347,6 +347,27 @@ header nav ul li a.admin-link::before {
     font-size: 0.9rem;
 }
 
+/* Example bullet list styles */
+.examples-list {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0.8rem 0;
+}
+
+.examples-list li {
+    margin-bottom: 0.7rem;
+    line-height: 1.5;
+    color: var(--primary-text);
+}
+
+.examples-list li:last-child {
+    margin-bottom: 0;
+}
+
+.examples-list li strong {
+    color: var(--accent-color);
+}
+
 .example-item {
     background-color: var(--surface-lighter);
     border-radius: 6px;

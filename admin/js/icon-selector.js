@@ -23,6 +23,7 @@ function createIconSelector(containerElementOrConfig, onSelectCallback, initialI
     let containerElement;
     let onSelect = onSelectCallback;
     let selectedIcon = initialIcon;
+    let currentCategory = 'all';
     
     // Check if the first argument is an object (config) or a DOM element
     if (containerElementOrConfig && typeof containerElementOrConfig === 'object' && !(containerElementOrConfig instanceof Element)) {
@@ -78,40 +79,110 @@ function createIconSelector(containerElementOrConfig, onSelectCallback, initialI
         console.warn('Material Icons library not found, using limited icon set');
     }
     
+    // Create category tabs
+    const createCategoryTabs = () => {
+        // Create the category tabs container
+        const categoryTabsContainer = document.createElement('div');
+        categoryTabsContainer.className = 'icon-category-tabs';
+        
+        // If window.iconCategories exists, use it
+        if (window.iconCategories && Array.isArray(window.iconCategories)) {
+            window.iconCategories.forEach(category => {
+                const tabElement = document.createElement('div');
+                tabElement.className = 'icon-category-tab';
+                if (category.id === currentCategory) {
+                    tabElement.classList.add('active');
+                }
+                tabElement.dataset.category = category.id;
+                tabElement.textContent = category.name;
+                
+                tabElement.addEventListener('click', () => {
+                    // Remove active class from all tabs
+                    document.querySelectorAll('.icon-category-tab').forEach(tab => {
+                        tab.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked tab
+                    tabElement.classList.add('active');
+                    
+                    // Update current category
+                    currentCategory = category.id;
+                    
+                    // Filter icons by category and search term
+                    filterIcons();
+                });
+                
+                categoryTabsContainer.appendChild(tabElement);
+            });
+            
+            // Insert before icon grid
+            const existingTabs = selectorContainer.querySelector('.icon-category-tabs');
+            if (existingTabs) {
+                existingTabs.remove();
+            }
+            
+            if (searchInput && searchInput.parentNode) {
+                searchInput.parentNode.insertBefore(categoryTabsContainer, searchInput.nextSibling);
+            }
+        }
+    };
+    
+    // Filter icons based on current search term and selected category
+    const filterIcons = () => {
+        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        
+        let filteredIcons = [];
+        
+        // First filter by category
+        if (currentCategory === 'all') {
+            filteredIcons = allIcons;
+        } else if (window.materialIconsByCategory && window.materialIconsByCategory[currentCategory]) {
+            filteredIcons = window.materialIconsByCategory[currentCategory];
+        } else {
+            filteredIcons = allIcons;
+        }
+        
+        // Then filter by search term if present
+        if (searchTerm) {
+            filteredIcons = filteredIcons.filter(icon => 
+                icon.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        // Limit to a reasonable number if no search term
+        if (!searchTerm && filteredIcons.length > 100) {
+            filteredIcons = filteredIcons.slice(0, 100);
+        }
+        
+        // Populate the grid with filtered icons
+        populateIconGrid(filteredIcons);
+    };
+    
+    // Create category tabs
+    createCategoryTabs();
+    
     // Set initial selected icon if provided
     if (selectedIcon) {
         updateSelectedIcon(selectedIcon);
     }
     
-    // Populate the icon grid with popular/initial icons
-    populateIconGrid(popularIcons);
+    // Initially show popular icons or category icons
+    if (window.materialIconsByCategory && window.materialIconsByCategory[currentCategory]) {
+        const categoryIcons = window.materialIconsByCategory[currentCategory];
+        populateIconGrid(categoryIcons.slice(0, 100)); // Show first 100 icons in category
+    } else {
+        populateIconGrid(popularIcons);
+    }
     
     // Event listener for the search input
     if (searchInput) {
-        searchInput.addEventListener('input', handleSearch);
+        searchInput.addEventListener('input', () => {
+            filterIcons();
+        });
     } else {
         console.warn('Icon search input element not found');
     }
     
-    /**
-     * Handles the search input event
-     */
-    function handleSearch() {
-        const searchTerm = searchInput.value.trim().toLowerCase();
-        
-        if (searchTerm.length === 0) {
-            // Show popular icons for empty search
-            populateIconGrid(popularIcons);
-        } else {
-            // Filter icons by search term
-            const filteredIcons = allIcons.filter(icon => 
-                icon.toLowerCase().includes(searchTerm)
-            );
-            
-            // Show search results
-            populateIconGrid(filteredIcons.slice(0, 30)); // Limit to 30 results
-        }
-    }
     
     /**
      * Populates the icon grid with the provided icons
@@ -151,38 +222,42 @@ function createIconSelector(containerElementOrConfig, onSelectCallback, initialI
         });
     }
     
-    /**
-     * Updates the selected icon display
-     * @param {string} icon - The selected icon name
-     */
-    function updateSelectedIcon(icon) {
-        currentSelectedIcon = icon;
-        
-        // Update the displayed icon
-        if (selectedIconDisplay) {
-            const iconElement = selectedIconDisplay.querySelector('.material-icons');
-            if (iconElement) {
-                iconElement.textContent = icon;
-            }
-        }
-        
-        // Update the icon name
-        if (selectedIconName) {
-            selectedIconName.textContent = icon;
-        }
-        
-        // Update selected state in the grid
-        if (iconGrid) {
-            const iconItems = iconGrid.querySelectorAll('.icon-item');
-            iconItems.forEach(item => {
-                if (item.title === icon) {
-                    item.classList.add('selected');
-                } else {
-                    item.classList.remove('selected');
-                }
-            });
+/**
+ * Updates the selected icon display
+ * @param {string} icon - The selected icon name
+ */
+function updateSelectedIcon(icon) {
+    if (!icon || icon === 'undefined') {
+        icon = 'help';
+    }
+    
+    currentSelectedIcon = icon;
+    
+    // Update the displayed icon
+    if (selectedIconDisplay) {
+        const iconElement = selectedIconDisplay.querySelector('.material-icons');
+        if (iconElement) {
+            iconElement.textContent = icon;
         }
     }
+    
+    // Update the icon name
+    if (selectedIconName) {
+        selectedIconName.textContent = icon;
+    }
+    
+    // Update selected state in the grid
+    if (iconGrid) {
+        const iconItems = iconGrid.querySelectorAll('.icon-item');
+        iconItems.forEach(item => {
+            if (item.title === icon) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+}
     
     // Return public methods
     return {
@@ -206,7 +281,7 @@ function createIconSelector(containerElementOrConfig, onSelectCallback, initialI
          * Refreshes the icon grid
          */
         refresh: function() {
-            handleSearch();
+            filterIcons();
         }
     };
 }
