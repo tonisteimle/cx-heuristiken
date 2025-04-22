@@ -31,11 +31,48 @@ export function SpecialImportFileDialog({ open, onOpenChange, onSuccess }: Speci
   const [file, setFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const [jsonData, setJsonData] = useState<any>(null)
+  const [importProgress, setImportProgress] = useState(0)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0])
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (!selectedFile) return
+
+    setFile(selectedFile)
+    setError(null)
+    setImportProgress(10)
+
+    try {
+      const fileContent = await selectedFile.text()
+      let jsonData: any
+
+      try {
+        jsonData = JSON.parse(fileContent)
+        setJsonData(jsonData)
+        setImportProgress(50)
+      } catch (parseError) {
+        setError(`Ungültiges JSON-Format: ${parseError instanceof Error ? parseError.message : "Unbekannter Fehler"}`)
+        setImportProgress(0)
+        return
+      }
+
+      // Hier können Sie die JSON-Datenstruktur überprüfen
+      if (!jsonData.principles || !Array.isArray(jsonData.principles)) {
+        setError("Ungültige JSON-Struktur: Das Feld 'principles' fehlt oder ist kein Array.")
+        setImportProgress(0)
+        return
+      }
+
+      // Wenn alles in Ordnung ist, zeige eine Erfolgsmeldung
       setError(null)
+      setImportProgress(100)
+      toast({
+        title: "Datei validiert",
+        description: "Die JSON-Datei wurde erfolgreich validiert.",
+      })
+    } catch (fileError) {
+      setError(`Fehler beim Lesen der Datei: ${fileError instanceof Error ? fileError.message : "Unbekannter Fehler"}`)
+      setImportProgress(0)
     }
   }
 
