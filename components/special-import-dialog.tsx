@@ -14,6 +14,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Check, Upload } from "lucide-react"
+import { ImportService } from "@/services/import-service"
 
 interface SpecialImportDialogProps {
   open: boolean
@@ -53,29 +54,27 @@ export function SpecialImportDialog({ open, onOpenChange, onSuccess }: SpecialIm
 
       setProgress(30)
 
-      // API-Aufruf zum Importieren der Daten
-      const response = await fetch("/api/special-import", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(principlesData),
-      })
+      // Importiere die Prinzipien
+      const importResult = await ImportService.importPrinciples(principlesData.principles)
 
       setProgress(70)
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Fehler beim Import")
+      if (!importResult.success) {
+        throw new Error(importResult.error || "Fehler beim Import")
       }
 
-      const result = await response.json()
-      setResult(result)
+      setResult({
+        stats: {
+          updated: importResult.stats?.principles || 0,
+          unchanged: 0,
+          errors: 0,
+        },
+      })
       setProgress(100)
 
       toast({
         title: "Import erfolgreich",
-        description: `${result.stats.updated} Prinzipien wurden aktualisiert.`,
+        description: `${importResult.stats?.principles || 0} Prinzipien wurden aktualisiert.`,
       })
 
       // Dialog schließen und Daten aktualisieren

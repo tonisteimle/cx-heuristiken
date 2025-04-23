@@ -2,20 +2,20 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog"
-import { Upload, AlertCircle, FileText, Check, X, AlertTriangle, Code, FileUp } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { getStorageService } from "@/services/storage-factory"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle, Check, Upload, FileText, X, AlertTriangle, Code, FileUp } from "lucide-react"
 import type { StorageData } from "@/types/storage-data"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { ImportService, type ImportOptions } from "@/services/import-service"
 
 // Importiere die Typografie-Komponenten
 import { DialogTitleText, DialogDescriptionText, SmallText, SectionTitle } from "@/components/ui/typography"
@@ -32,16 +32,28 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
   const [jsonData, setJsonData] = useState<StorageData | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [importProgress, setImportProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState<string>("")
   const [replaceMode, setReplaceMode] = useState(false)
   const [importMethod, setImportMethod] = useState<"file" | "text">("file")
   const [jsonText, setJsonText] = useState<string>("")
-  const [importOptions, setImportOptions] = useState({
+  const [importOptions, setImportOptions] = useState<ImportOptions>({
     guidelines: true,
     principles: true,
     categories: true,
+    replaceMode: false,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+
+  // Update replaceMode when importOptions.replaceMode changes
+  useEffect(() => {
+    setReplaceMode(importOptions.replaceMode)
+  }, [importOptions.replaceMode])
+
+  // Update importOptions.replaceMode when replaceMode changes
+  useEffect(() => {
+    setImportOptions((prev) => ({ ...prev, replaceMode }))
+  }, [replaceMode])
 
   const resetState = () => {
     setIsImporting(false)
@@ -49,12 +61,14 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     setJsonData(null)
     setFileName(null)
     setImportProgress(0)
+    setProgressMessage("")
     setReplaceMode(false)
     setJsonText("")
     setImportOptions({
       guidelines: true,
       principles: true,
       categories: true,
+      replaceMode: false,
     })
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
@@ -68,11 +82,13 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     setError(null)
     setFileName(file.name)
     setImportProgress(10)
+    setProgressMessage("Reading file...")
 
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         setImportProgress(30)
+        setProgressMessage("Processing file content...")
         const content = e.target?.result as string
 
         // Set the content to the text area
@@ -81,56 +97,28 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
         // Switch to the text tab
         setImportMethod("text")
 
-        // Try to validate the JSON
-        try {
-          const parsedData = JSON.parse(content)
-          setImportProgress(50)
+        // Validate the JSON
+        const validationResult = await ImportService.validateJsonData(content, (progress) => {
+          setImportProgress(progress.progress)
+          setProgressMessage(progress.stage)
+        })
 
-          // Validate structure - less strict validation
-          if (!parsedData) {
-            setError("The JSON file is empty or invalid.")
-            setImportProgress(0)
-            return
-          }
-
-          // Ensure the basic structure is present, but allow missing attributes
-          const validData: StorageData = {
-            guidelines: Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
-            categories: Array.isArray(parsedData.categories) ? parsedData.categories : [],
-            principles: Array.isArray(parsedData.principles) ? parsedData.principles : [],
-            lastUpdated: parsedData.lastUpdated || new Date().toISOString(),
-            version: parsedData.version || "2.0",
-          }
-
-          // Check if at least one of the arrays contains data
-          if (
-            validData.guidelines.length === 0 &&
-            validData.categories.length === 0 &&
-            validData.principles.length === 0
-          ) {
-            setError("The file contains no importable data (no guidelines, categories, or principles).")
-            setImportProgress(0)
-            return
-          }
-
-          setImportProgress(70)
-
-          // Count guidelines with images
-          const guidelinesWithImages = validData.guidelines.filter((g: any) => g.imageUrl || g.detailImageUrl).length
-          console.log(`Import contains ${guidelinesWithImages} guidelines with images`)
-
-          setJsonData(validData)
+        if (validationResult.valid && validationResult.data) {
+          setJsonData(validationResult.data)
           setImportProgress(100)
+          setProgressMessage("Validation complete")
           setError(null)
-        } catch (err) {
-          setError("Invalid JSON format. Please ensure the file contains valid JSON.")
+        } else {
+          setError(validationResult.error || "Unknown validation error")
           setImportProgress(0)
+          setProgressMessage("")
           setJsonData(null)
         }
       } catch (err) {
         console.error("Error processing JSON file:", err)
         setError(`Error processing JSON file: ${err instanceof Error ? err.message : "Unknown error"}`)
         setImportProgress(0)
+        setProgressMessage("")
         setJsonData(null)
       }
     }
@@ -138,13 +126,14 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     reader.onerror = () => {
       setError("Error reading file. Please try again with a different file.")
       setImportProgress(0)
+      setProgressMessage("")
       setJsonData(null)
     }
 
     reader.readAsText(file)
   }
 
-  const handleJsonTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleJsonTextChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setJsonText(e.target.value)
     setError(null)
     setJsonData(null)
@@ -153,55 +142,23 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     if (!e.target.value.trim()) return
 
     setImportProgress(10)
+    setProgressMessage("Validating JSON...")
 
-    try {
-      // Basic validation - check if it's valid JSON
-      let parsedData: any
-      try {
-        parsedData = JSON.parse(e.target.value)
-        setImportProgress(50)
-      } catch (err) {
-        setError("Invalid JSON format. Please ensure the text contains valid JSON.")
-        setImportProgress(0)
-        return
-      }
+    // Validate the JSON
+    const validationResult = await ImportService.validateJsonData(e.target.value, (progress) => {
+      setImportProgress(progress.progress)
+      setProgressMessage(progress.stage)
+    })
 
-      // Validate structure - less strict validation
-      if (!parsedData) {
-        setError("The JSON text is empty or invalid.")
-        setImportProgress(0)
-        return
-      }
-
-      // Ensure the basic structure is present, but allow missing attributes
-      const validData: StorageData = {
-        guidelines: Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
-        categories: Array.isArray(parsedData.categories) ? parsedData.categories : [],
-        principles: Array.isArray(parsedData.principles) ? parsedData.principles : [],
-        lastUpdated: parsedData.lastUpdated || new Date().toISOString(),
-        version: parsedData.version || "2.0",
-      }
-
-      // Check if at least one of the arrays contains data
-      if (validData.guidelines.length === 0 && validData.categories.length === 0 && validData.principles.length === 0) {
-        setError("The text contains no importable data (no guidelines, categories, or principles).")
-        setImportProgress(0)
-        return
-      }
-
-      setImportProgress(70)
-
-      // Count guidelines with images
-      const guidelinesWithImages = validData.guidelines.filter((g: any) => g.imageUrl || g.detailImageUrl).length
-      console.log(`Import contains ${guidelinesWithImages} guidelines with images`)
-
-      setJsonData(validData)
+    if (validationResult.valid && validationResult.data) {
+      setJsonData(validationResult.data)
       setImportProgress(100)
+      setProgressMessage("Validation complete")
       setError(null)
-    } catch (err) {
-      console.error("Error processing JSON text:", err)
-      setError(`Error processing JSON text: ${err instanceof Error ? err.message : "Unknown error"}`)
+    } else {
+      setError(validationResult.error || "Unknown validation error")
       setImportProgress(0)
+      setProgressMessage("")
       setJsonData(null)
     }
   }
@@ -215,106 +172,37 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     setIsImporting(true)
     setError(null)
     setImportProgress(10)
+    setProgressMessage("Starting import...")
 
     try {
-      // Parse the JSON text
-      let parsedData: any
-      try {
-        parsedData = JSON.parse(jsonText)
-        setImportProgress(30)
-      } catch (err) {
-        setError(`Invalid JSON format: ${err instanceof Error ? err.message : "Unknown error"}`)
-        setIsImporting(false)
-        return
-      }
-
-      // Validate and prepare the data
-      const validData: StorageData = {
-        guidelines: Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
-        categories: Array.isArray(parsedData.categories) ? parsedData.categories : [],
-        principles: Array.isArray(parsedData.principles) ? parsedData.principles : [],
-        lastUpdated: parsedData.lastUpdated || new Date().toISOString(),
-        version: "2.0",
-      }
-
-      // Check if there's any data to import
-      if (validData.guidelines.length === 0 && validData.categories.length === 0 && validData.principles.length === 0) {
-        setError("The JSON contains no importable data (no guidelines, categories, or principles).")
-        setIsImporting(false)
-        return
-      }
-
-      // Filter data based on import options
-      const filteredData: StorageData = {
-        guidelines: importOptions.guidelines ? validData.guidelines : [],
-        categories: importOptions.categories ? validData.categories : [],
-        principles: importOptions.principles ? validData.principles : [],
-        lastUpdated: new Date().toISOString(),
-        version: "2.0",
-      }
-
-      setImportProgress(50)
-      const storageService = getStorageService()
-
-      // Log the operation to console
-      console.log(`${replaceMode ? "Replacing all data" : "Importing data"}`, {
-        guidelinesCount: filteredData.guidelines.length,
-        categoriesCount: filteredData.categories.length,
-        principlesCount: filteredData.principles.length,
-        replaceMode,
-        dataSize: JSON.stringify(filteredData).length,
+      // Validate the JSON again to ensure it's valid
+      const validationResult = await ImportService.validateJsonData(jsonText, (progress) => {
+        setImportProgress(progress.progress / 4) // First quarter of the progress
+        setProgressMessage(progress.stage)
       })
 
-      let success = false
-      let finalData
-
-      if (replaceMode) {
-        // Replace all existing data
-        finalData = {
-          ...filteredData,
-          lastUpdated: new Date().toISOString(),
-        }
-
-        // Save to storage
-        try {
-          success = await storageService.saveData(finalData)
-        } catch (saveError) {
-          console.error("Error saving data during import:", saveError)
-          throw new Error(`Error saving data: ${saveError instanceof Error ? saveError.message : "Unknown error"}`)
-        }
-      } else {
-        // Add data to existing
-        let currentData
-        try {
-          currentData = await storageService.loadData()
-        } catch (loadError) {
-          console.error("Error loading current data during import:", loadError)
-          throw new Error(
-            `Error loading current data: ${loadError instanceof Error ? loadError.message : "Unknown error"}`,
-          )
-        }
-
-        // Intelligent merge of data
-        finalData = mergeData(currentData, filteredData)
-
-        // Save to storage
-        try {
-          success = await storageService.saveData(finalData)
-        } catch (saveError) {
-          console.error("Error saving merged data during import:", saveError)
-          throw new Error(
-            `Error saving merged data: ${saveError instanceof Error ? saveError.message : "Unknown error"}`,
-          )
-        }
+      if (!validationResult.valid || !validationResult.data) {
+        throw new Error(validationResult.error || "Invalid JSON data")
       }
 
-      setImportProgress(80)
+      // Import the data
+      const importResult = await ImportService.importData(validationResult.data, importOptions, (progress) => {
+        // Map the progress to 25-100% range
+        setImportProgress(25 + (progress.progress * 75) / 100)
+        setProgressMessage(progress.message || progress.stage)
+      })
 
-      if (success) {
+      if (importResult.success) {
         setImportProgress(100)
+        setProgressMessage("Import complete")
+
         toast({
           title: replaceMode ? "Data replaced" : "Import successful",
-          description: `${replaceMode ? "Replaced" : "Imported"}: ${filteredData.guidelines.length} guidelines, ${filteredData.categories.length} categories, ${filteredData.principles.length} principles.`,
+          description: `${replaceMode ? "Replaced" : "Imported"}: ${
+            importResult.stats?.guidelines || 0
+          } guidelines, ${importResult.stats?.categories || 0} categories, ${
+            importResult.stats?.principles || 0
+          } principles.`,
         })
 
         // Close dialog and reset state
@@ -329,110 +217,16 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
           window.location.reload()
         }, 1000)
       } else {
-        throw new Error(`Error ${replaceMode ? "replacing" : "saving"} imported data`)
+        throw new Error(importResult.error || "Unknown import error")
       }
     } catch (err) {
       console.error(`Error ${replaceMode ? "replacing" : "importing"} JSON data:`, err)
       setError(`Import failed: ${err instanceof Error ? err.message : "Unknown error"}`)
       setImportProgress(0)
+      setProgressMessage("")
     } finally {
       setIsImporting(false)
     }
-  }
-
-  // Function for intelligent merging of data
-  const mergeData = (currentData: StorageData, importData: StorageData): StorageData => {
-    // Merge categories (simple, as they are just strings)
-    const mergedCategories = [...new Set([...currentData.categories, ...importData.categories])]
-
-    // Merge principles
-    const mergedPrinciples = mergePrinciples(currentData.principles, importData.principles)
-
-    // Merge guidelines
-    const mergedGuidelines = mergeGuidelines(currentData.guidelines, importData.guidelines)
-
-    return {
-      guidelines: mergedGuidelines,
-      categories: mergedCategories,
-      principles: mergedPrinciples,
-      lastUpdated: new Date().toISOString(),
-      version: "2.0",
-    }
-  }
-
-  // Function to merge principles
-  const mergePrinciples = (existing: any[], imported: any[]): any[] => {
-    const result = [...existing]
-    const existingIds = new Set(existing.map((p) => p.id))
-
-    imported.forEach((importedPrinciple) => {
-      // Check if principle already exists
-      const existingIndex = result.findIndex((p) => p.id === importedPrinciple.id)
-
-      if (existingIndex >= 0) {
-        // Add missing attributes to existing principle
-        result[existingIndex] = {
-          ...result[existingIndex],
-          ...importedPrinciple,
-          // Ensure no attributes are lost
-          name: importedPrinciple.name || result[existingIndex].name,
-          description: importedPrinciple.description || result[existingIndex].description,
-          evidenz: importedPrinciple.evidenz || result[existingIndex].evidenz,
-        }
-      } else {
-        // Add new principle
-        result.push({
-          id: importedPrinciple.id || `principle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: importedPrinciple.name || "Unnamed Principle",
-          description: importedPrinciple.description || "",
-          evidenz: importedPrinciple.evidenz || "",
-          ...importedPrinciple,
-        })
-      }
-    })
-
-    return result
-  }
-
-  // Function to merge guidelines
-  const mergeGuidelines = (existing: any[], imported: any[]): any[] => {
-    const result = [...existing]
-    const existingIds = new Set(existing.map((g) => g.id))
-
-    imported.forEach((importedGuideline) => {
-      // Check if guideline already exists
-      const existingIndex = result.findIndex((g) => g.id === importedGuideline.id)
-
-      if (existingIndex >= 0) {
-        // Add missing attributes to existing guideline
-        result[existingIndex] = {
-          ...result[existingIndex],
-          ...importedGuideline,
-          // Ensure no attributes are lost
-          title: importedGuideline.title || result[existingIndex].title,
-          text: importedGuideline.text || result[existingIndex].text,
-          justification: importedGuideline.justification || result[existingIndex].justification,
-          categories: importedGuideline.categories || result[existingIndex].categories || [],
-          principles: importedGuideline.principles || result[existingIndex].principles || [],
-          updatedAt: new Date().toISOString(),
-        }
-      } else {
-        // Add new guideline with default values for missing attributes
-        result.push({
-          id: importedGuideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          title: importedGuideline.title || "Unnamed Guideline",
-          text: importedGuideline.text || "",
-          justification: importedGuideline.justification || "",
-          categories: importedGuideline.categories || [],
-          principles: importedGuideline.principles || [],
-          createdAt: importedGuideline.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          ...importedGuideline,
-        })
-      }
-    })
-
-    return result
   }
 
   // Generate a summary of what will be imported
@@ -651,7 +445,11 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
           <div className="space-y-2">
             <Progress value={importProgress} className="h-2" />
             <SmallText className="text-muted-foreground">
-              {isImporting ? "Importing..." : importProgress === 100 ? "Validation complete" : "Validating..."}
+              {isImporting
+                ? `Importing... ${progressMessage}`
+                : importProgress === 100
+                  ? "Validation complete"
+                  : `Validating... ${progressMessage}`}
             </SmallText>
           </div>
         )}

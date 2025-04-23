@@ -1,4 +1,5 @@
 import type { Guideline } from "../types/guideline"
+import { IncrementalImportService } from "./incremental-import-service"
 
 // Fügen Sie diese Methode zur JsonFileService-Klasse hinzu oder aktualisieren Sie sie
 
@@ -43,14 +44,15 @@ class JsonFileService {
 
   static async saveData(data: StorageData): Promise<boolean> {
     try {
-      // Ensure the data has the correct structure
-      const validData: StorageData = {
-        guidelines: Array.isArray(data.guidelines) ? data.guidelines : [],
-        categories: Array.isArray(data.categories) ? data.categories : [],
-        principles: Array.isArray(data.principles) ? data.principles : [],
-        lastUpdated: new Date().toISOString(),
-        version: "2.0",
-      }
+      // Validate and clean the data incrementally
+      const validData = await IncrementalImportService.validateData(data, (stage, processed, total) => {
+        console.log(`Validating ${stage}: ${processed}/${total}`)
+      })
+
+      // Log the validated data
+      console.log(
+        `Validated data: ${validData.guidelines.length} guidelines, ${validData.categories.length} categories, ${validData.principles.length} principles`,
+      )
 
       // Speichern über die API
       const response = await fetch("/api/supabase/save-data", {
@@ -61,12 +63,23 @@ class JsonFileService {
         body: JSON.stringify({ data: validData }),
       })
 
-      const result = await response.json()
+      // Check if the response is valid
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("API error response:", errorText)
+        return false
+      }
 
-      if (result.success) {
-        return true
-      } else {
-        console.error("API error:", result.error)
+      try {
+        const result = await response.json()
+        if (result.success) {
+          return true
+        } else {
+          console.error("API error:", result.error)
+          return false
+        }
+      } catch (jsonError) {
+        console.error("Error parsing API response:", jsonError)
         return false
       }
     } catch (error) {

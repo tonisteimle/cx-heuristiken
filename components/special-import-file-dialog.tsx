@@ -16,6 +16,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Check, Upload, FileText, X } from "lucide-react"
+import { ImportService } from "@/services/import-service"
 
 interface SpecialImportFileDialogProps {
   open: boolean
@@ -44,32 +45,26 @@ export function SpecialImportFileDialog({ open, onOpenChange, onSuccess }: Speci
 
     try {
       const fileContent = await selectedFile.text()
-      let jsonData: any
 
-      try {
-        jsonData = JSON.parse(fileContent)
-        setJsonData(jsonData)
-        setImportProgress(50)
-      } catch (parseError) {
-        setError(`Ungültiges JSON-Format: ${parseError instanceof Error ? parseError.message : "Unbekannter Fehler"}`)
-        setImportProgress(0)
-        return
-      }
-
-      // Hier können Sie die JSON-Datenstruktur überprüfen
-      if (!jsonData.principles || !Array.isArray(jsonData.principles)) {
-        setError("Ungültige JSON-Struktur: Das Feld 'principles' fehlt oder ist kein Array.")
-        setImportProgress(0)
-        return
-      }
-
-      // Wenn alles in Ordnung ist, zeige eine Erfolgsmeldung
-      setError(null)
-      setImportProgress(100)
-      toast({
-        title: "Datei validiert",
-        description: "Die JSON-Datei wurde erfolgreich validiert.",
+      // Validate the JSON
+      const validationResult = await ImportService.validateJsonData(fileContent, (progress) => {
+        setImportProgress(progress.progress)
       })
+
+      if (validationResult.valid && validationResult.data) {
+        setJsonData(validationResult.data)
+        setImportProgress(100)
+        setError(null)
+
+        toast({
+          title: "Datei validiert",
+          description: "Die JSON-Datei wurde erfolgreich validiert.",
+        })
+      } else {
+        setError(validationResult.error || "Ungültige JSON-Struktur")
+        setImportProgress(0)
+        setJsonData(null)
+      }
     } catch (fileError) {
       setError(`Fehler beim Lesen der Datei: ${fileError instanceof Error ? fileError.message : "Unbekannter Fehler"}`)
       setImportProgress(0)
@@ -77,7 +72,7 @@ export function SpecialImportFileDialog({ open, onOpenChange, onSuccess }: Speci
   }
 
   const handleImport = async () => {
-    if (!file) {
+    if (!file || !jsonData) {
       setError("Bitte wählen Sie eine JSON-Datei aus")
       return
     }
@@ -87,32 +82,41 @@ export function SpecialImportFileDialog({ open, onOpenChange, onSuccess }: Speci
       setProgress(10)
       setError(null)
 
-      // Formular erstellen
-      const formData = new FormData()
-      formData.append("file", file)
+      // Extrahiere die Prinzipien-Elemente aus den Daten
+      const principleElements = jsonData.principles
+        ? jsonData.principles.map((p: any) => ({
+            id: p.id,
+            elements: p.elements || [],
+          }))
+        : []
+
+      if (principleElements.length === 0) {
+        throw new Error("Keine Prinzipien-Elemente in der Datei gefunden")
+      }
 
       setProgress(30)
 
-      // API-Aufruf zum Importieren der Datei
-      const response = await fetch("/api/special-import-file", {
-        method: "POST",
-        body: formData,
-      })
+      // Importiere die Prinzipien-Elemente
+      const importResult = await ImportService.importPrincipleElements(principleElements)
 
       setProgress(70)
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Fehler beim Import")
+      if (!importResult.success) {
+        throw new Error(importResult.error || "Fehler beim Import")
       }
 
-      const result = await response.json()
-      setResult(result)
+      setResult({
+        stats: {
+          updated: importResult.stats?.principles || 0,
+          unchanged: 0,
+          errors: 0,
+        },
+      })
       setProgress(100)
 
       toast({
         title: "Import erfolgreich",
-        description: `${result.stats.updated} Prinzipien-Kategorien wurden aktualisiert.`,
+        description: `${importResult.stats?.principles || 0} Prinzipien-Kategorien wurden aktualisiert.`,
       })
 
       // Dialog schließen und Daten aktualisieren

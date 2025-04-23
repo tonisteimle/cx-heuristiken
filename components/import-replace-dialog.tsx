@@ -17,7 +17,7 @@ import { Upload, AlertCircle, FileText, Check, X, AlertTriangle } from "lucide-r
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import type { StorageData } from "@/services/json-file-service"
-import { LocalStorageService } from "@/services/local-storage-service"
+import { ImportService } from "@/services/import-service"
 
 interface ImportReplaceDialogProps {
   open: boolean
@@ -31,6 +31,7 @@ export function ImportReplaceDialog({ open, onOpenChange, onSuccess }: ImportRep
   const [jsonData, setJsonData] = useState<StorageData | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [importProgress, setImportProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -40,114 +41,56 @@ export function ImportReplaceDialog({ open, onOpenChange, onSuccess }: ImportRep
     setJsonData(null)
     setFileName(null)
     setImportProgress(0)
+    setProgressMessage("")
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
   }
 
-  // Verbesserte handleFileChange-Funktion
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
     setError(null)
     setFileName(file.name)
     setImportProgress(10)
+    setProgressMessage("Reading file...")
 
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        setImportProgress(30)
         const content = e.target?.result as string
 
-        // Basic validation - check if it's valid JSON
-        let parsedData: any
-        try {
-          parsedData = JSON.parse(content)
-          setImportProgress(50)
-        } catch (err) {
-          setError("Ungültiges JSON-Format. Bitte stellen Sie sicher, dass die Datei gültiges JSON enthält.")
+        // Validate the JSON
+        const validationResult = await ImportService.validateJsonData(content, (progress) => {
+          setImportProgress(progress.progress)
+          setProgressMessage(progress.stage)
+        })
+
+        if (validationResult.valid && validationResult.data) {
+          setJsonData(validationResult.data)
+          setImportProgress(100)
+          setProgressMessage("Validation complete")
+          setError(null)
+        } else {
+          setError(validationResult.error || "Unknown validation error")
           setImportProgress(0)
-          return
+          setProgressMessage("")
+          setJsonData(null)
         }
-
-        // Validate structure
-        if (!parsedData) {
-          setError("Die JSON-Datei ist leer oder ungültig.")
-          setImportProgress(0)
-          return
-        }
-
-        // Check for required fields
-        if (!parsedData.guidelines || !Array.isArray(parsedData.guidelines)) {
-          setError("Ungültige JSON-Struktur: Das Feld 'guidelines' fehlt oder ist kein Array.")
-          setImportProgress(0)
-          return
-        }
-
-        if (!parsedData.categories || !Array.isArray(parsedData.categories)) {
-          setError("Ungültige JSON-Struktur: Das Feld 'categories' fehlt oder ist kein Array.")
-          setImportProgress(0)
-          return
-        }
-
-        if (!parsedData.principles || !Array.isArray(parsedData.principles)) {
-          setError("Ungültige JSON-Struktur: Das Feld 'principles' fehlt oder ist kein Array.")
-          setImportProgress(0)
-          return
-        }
-
-        // Validate guidelines structure
-        for (let i = 0; i < parsedData.guidelines.length; i++) {
-          const guideline = parsedData.guidelines[i]
-          if (!guideline.id || !guideline.title || !guideline.text || !guideline.categories) {
-            setError(
-              `Ungültige Guideline an Index ${i}: Erforderliche Felder fehlen (id, title, text oder categories).`,
-            )
-            setImportProgress(0)
-            return
-          }
-        }
-
-        // Validate principles structure
-        for (let i = 0; i < parsedData.principles.length; i++) {
-          const principle = parsedData.principles[i]
-          if (!principle.id || !principle.name || !principle.description) {
-            setError(`Ungültiges Prinzip an Index ${i}: Erforderliche Felder fehlen (id, name oder description).`)
-            setImportProgress(0)
-            return
-          }
-        }
-
-        setImportProgress(70)
-
-        // Bereinige die Daten
-        const cleanedData = LocalStorageService.cleanImageReferences(parsedData)
-
-        // All validations passed
-        const validData: StorageData = {
-          guidelines: cleanedData.guidelines,
-          categories: cleanedData.categories,
-          principles: cleanedData.principles,
-          experiments: cleanedData.experiments || [],
-          lastUpdated: cleanedData.lastUpdated || new Date().toISOString(),
-          version: cleanedData.version || "2.0",
-        }
-
-        setJsonData(validData)
-        setImportProgress(100)
-        setError(null)
       } catch (err) {
-        console.error("Fehler beim Verarbeiten der JSON-Datei:", err)
-        setError(`Fehler beim Verarbeiten der JSON-Datei: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`)
+        console.error("Error processing JSON file:", err)
+        setError(`Error processing JSON file: ${err instanceof Error ? err.message : "Unknown error"}`)
         setImportProgress(0)
+        setProgressMessage("")
         setJsonData(null)
       }
     }
 
     reader.onerror = () => {
-      setError("Fehler beim Lesen der Datei. Bitte versuchen Sie es mit einer anderen Datei.")
+      setError("Error reading file. Please try again with a different file.")
       setImportProgress(0)
+      setProgressMessage("")
       setJsonData(null)
     }
 
@@ -160,61 +103,54 @@ export function ImportReplaceDialog({ open, onOpenChange, onSuccess }: ImportRep
     setIsImporting(true)
     setError(null)
     setImportProgress(10)
+    setProgressMessage("Starting import...")
 
     try {
-      // Speichere zuerst im localStorage
-      const localSuccess = LocalStorageService.saveData({
-        ...jsonData,
-        lastUpdated: new Date().toISOString(),
-      })
+      // Import the data with replace mode
+      const importResult = await ImportService.importData(
+        jsonData,
+        {
+          guidelines: true,
+          principles: true,
+          categories: true,
+          replaceMode: true,
+        },
+        (progress) => {
+          setImportProgress(progress.progress)
+          setProgressMessage(progress.message || progress.stage)
+        },
+      )
 
-      if (!localSuccess) {
-        throw new Error("Failed to save data to localStorage")
-      }
+      if (importResult.success) {
+        setImportProgress(100)
+        setProgressMessage("Import complete")
 
-      setImportProgress(50)
-
-      try {
-        // Versuche auch in der JSON-Datei zu speichern, aber lasse den Import nicht fehlschlagen, wenn dies nicht klappt
-        const response = await fetch("/api/replace-all-data", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(jsonData),
+        toast({
+          title: "Import successful",
+          description: `Successfully imported ${importResult.stats?.guidelines || 0} guidelines, ${
+            importResult.stats?.categories || 0
+          } categories, and ${importResult.stats?.principles || 0} principles.`,
         })
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          console.warn("API warning: Failed to save to JSON file:", errorData)
-          // Wir werfen hier keinen Fehler, da der localStorage-Import erfolgreich war
-        }
-      } catch (apiError) {
-        console.warn("API warning: Network error when saving to JSON file:", apiError)
-        // Wir werfen hier keinen Fehler, da der localStorage-Import erfolgreich war
+        // Close dialog and reset state
+        resetState()
+        onOpenChange(false)
+
+        // Call onSuccess to trigger a refresh
+        onSuccess()
+
+        // Force a hard refresh of the page to ensure data is reloaded
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      } else {
+        throw new Error(importResult.error || "Unknown import error")
       }
-
-      setImportProgress(100)
-      toast({
-        title: "Import successful",
-        description: `Successfully imported ${jsonData.guidelines.length} guidelines, ${jsonData.categories.length} categories, and ${jsonData.principles.length} principles.`,
-      })
-
-      // Close dialog and reset state
-      resetState()
-      onOpenChange(false)
-
-      // Call onSuccess to trigger a refresh
-      onSuccess()
-
-      // Force a hard refresh of the page to ensure data is reloaded
-      setTimeout(() => {
-        window.location.reload()
-      }, 1000)
     } catch (err) {
       console.error("Error importing JSON data:", err)
       setError(`Import failed: ${err instanceof Error ? err.message : "Unknown error"}`)
       setImportProgress(0)
+      setProgressMessage("")
     } finally {
       setIsImporting(false)
     }
@@ -315,10 +251,10 @@ export function ImportReplaceDialog({ open, onOpenChange, onSuccess }: ImportRep
                 <Progress value={importProgress} className="h-2" />
                 <p className="text-xs text-muted-foreground">
                   {isImporting
-                    ? "Importiere..."
+                    ? `Importiere... ${progressMessage}`
                     : importProgress === 100
                       ? "Validierung abgeschlossen"
-                      : "Validiere..."}
+                      : `Validiere... ${progressMessage}`}
                 </p>
               </div>
             )}
