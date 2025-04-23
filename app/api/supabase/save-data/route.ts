@@ -9,62 +9,12 @@ export async function POST(request: NextRequest) {
     console.log("Request method:", request.method)
     console.log("Content-Type:", request.headers.get("Content-Type"))
 
-    // Get the request body as text first for debugging
-    let bodyText
-    try {
-      // Clone the request to avoid consuming the body
-      const clonedRequest = request.clone()
-      bodyText = await clonedRequest.text()
-
-      if (!bodyText || bodyText.trim() === "") {
-        return NextResponse.json({ success: false, error: "Empty request body" }, { status: 400 })
-      }
-
-      console.log("Request body length:", bodyText.length)
-      console.log("Request body (first 100 chars):", bodyText.substring(0, 100))
-    } catch (textError) {
-      console.error("Error reading request body as text:", textError)
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Error reading request body: ${textError instanceof Error ? textError.message : String(textError)}`,
-        },
-        { status: 400 },
-      )
-    }
-
-    // Parse the body text as JSON with error handling
-    let body
-    try {
-      body = JSON.parse(bodyText)
-    } catch (parseError) {
-      console.error("Error parsing request body as JSON:", parseError)
-
-      // Try to recover from common JSON parsing errors
-      try {
-        // Try to fix common JSON issues
-        const fixedText = bodyText
-          .replace(/\n/g, " ")
-          .replace(/\r/g, "")
-          .replace(/\t/g, " ")
-          .replace(/,\s*}/g, "}") // Remove trailing commas
-          .replace(/,\s*]/g, "]") // Remove trailing commas in arrays
-
-        body = JSON.parse(fixedText)
-        console.log("Successfully recovered from JSON parsing error")
-      } catch (recoveryError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Invalid JSON in request body: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          },
-          { status: 400 },
-        )
-      }
-    }
+    // Parse the request body
+    const body = await request.json()
 
     // Extract the data field
     const data = body?.data
+    const isIncremental = body?.isIncremental || false
 
     // Validate the data with robust error handling
     if (!data) {
@@ -103,7 +53,7 @@ export async function POST(request: NextRequest) {
     )
 
     // Merge categories if needed
-    if (existingData?.data?.categories && cleanData.categories) {
+    if (existingData?.data?.categories && cleanData.categories && !isIncremental) {
       // Ensure we don't have duplicate categories
       const existingCategories = existingData.data.categories || []
       const newCategories = cleanData.categories || []
@@ -117,7 +67,7 @@ export async function POST(request: NextRequest) {
     console.log(`Data size: ${dataSize} bytes`)
 
     // Supabase has a 1MB limit for JSON columns
-    if (dataSize > 900000) {
+    if (dataSize > 900000 && !isIncremental) {
       // 900KB to be safe
       console.warn("Data size exceeds safe limit for Supabase JSON column")
       return NextResponse.json(

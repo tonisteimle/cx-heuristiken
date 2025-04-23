@@ -3,13 +3,13 @@ import type { Guideline } from "@/types/guideline"
 
 export interface StorageInterface {
   // Data operations
-  saveData(data: StorageData): Promise<boolean>
+  saveData(data: StorageData, isIncremental?: boolean): Promise<boolean>
   loadData(): Promise<StorageData>
   saveGuideline(guideline: Guideline): Promise<boolean>
   deleteGuideline(id: string): Promise<boolean>
 
   // Image operations
-  uploadImage(file: File): Promise<{ url: string; name: string } | null>
+  uploadImage(file: File): Promise<{ url: string; name: string; base64?: string } | null>
   deleteImage(url: string): Promise<boolean>
 
   // Stats

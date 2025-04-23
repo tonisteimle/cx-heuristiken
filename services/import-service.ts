@@ -1,6 +1,7 @@
-import type { Principle } from "@/types/guideline"
 import type { StorageData } from "@/types/storage-data"
 import { getStorageService } from "./storage-factory"
+import type { Guideline, Principle } from "@/types/guideline"
+import { JsonValidator } from "./json-validator"
 
 export interface ImportOptions {
   guidelines: boolean
@@ -32,6 +33,7 @@ export class ImportService {
   /**
    * Validates JSON data for import
    * @param jsonText The JSON text to validate
+   * @param onProgress Optional callback for progress updates
    * @returns Validation result with parsed data if successful
    */
   static async validateJsonData(
@@ -39,7 +41,9 @@ export class ImportService {
     onProgress?: (progress: ImportProgress) => void,
   ): Promise<{ valid: boolean; data?: StorageData; error?: string }> {
     try {
+      console.log("validateJsonData: Starting validation")
       if (!jsonText || jsonText.trim() === "") {
+        console.warn("validateJsonData: Empty JSON data")
         return { valid: false, error: "Empty JSON data" }
       }
 
@@ -48,32 +52,50 @@ export class ImportService {
         onProgress({ stage: "parsing", progress: 10 })
       }
 
-      // Try to parse the JSON
-      let parsedData: any
-      try {
-        // Try to fix common JSON issues before parsing
-        const cleanedText = jsonText
-          .replace(/\n/g, " ")
-          .replace(/\r/g, "")
-          .replace(/\t/g, " ")
-          .replace(/,\s*}/g, "}") // Remove trailing commas
-          .replace(/,\s*]/g, "]") // Remove trailing commas in arrays
+      // Verbesserte JSON-Validierung und -Korrektur
+      const validationResult = JsonValidator.validateAndFix(jsonText)
 
-        parsedData = JSON.parse(cleanedText)
-      } catch (err) {
+      // Report progress
+      if (onProgress) {
+        onProgress({ stage: "validating structure", progress: 20 })
+      }
+
+      if (!validationResult.valid) {
+        console.error("validateJsonData: JSON structure validation failed", validationResult)
         return {
           valid: false,
-          error: `Invalid JSON format: ${err instanceof Error ? err.message : "Unknown error"}`,
+          error: `JSON-Struktur konnte nicht korrigiert werden: ${validationResult.originalError}`,
+        }
+      }
+
+      // Verwende den korrigierten JSON-Text
+      const fixedJsonText = validationResult.fixed
+
+      // Wenn Korrekturen vorgenommen wurden, logge sie
+      if (validationResult.corrections.length > 0) {
+        console.log("validateJsonData: JSON corrections applied:", validationResult.corrections)
+      }
+
+      // Try to parse the JSON
+      let parsedData: Partial<StorageData>
+      try {
+        parsedData = JSON.parse(fixedJsonText)
+      } catch (err) {
+        console.error("validateJsonData: JSON parsing error after fixes", err)
+        return {
+          valid: false,
+          error: `Invalid JSON format after fixes: ${err instanceof Error ? err.message : "Unknown error"}`,
         }
       }
 
       // Report progress
       if (onProgress) {
-        onProgress({ stage: "validating", progress: 30 })
+        onProgress({ stage: "validating content", progress: 30 })
       }
 
       // Validate structure - less strict validation
       if (!parsedData || typeof parsedData !== "object") {
+        console.warn("validateJsonData: Parsed data is not an object")
         return { valid: false, error: "The JSON data is empty or invalid." }
       }
 
@@ -88,17 +110,23 @@ export class ImportService {
 
       // Check if at least one of the arrays contains data
       if (validData.guidelines.length === 0 && validData.categories.length === 0 && validData.principles.length === 0) {
+        console.warn("validateJsonData: No importable data found")
         return {
           valid: false,
           error: "The JSON contains no importable data (no guidelines, categories, or principles).",
         }
       }
 
+      // Sanitize text fields in guidelines and principles
+      validData.guidelines = this.sanitizeGuidelines(validData.guidelines)
+      validData.principles = this.sanitizePrinciples(validData.principles)
+
       // Report progress
       if (onProgress) {
         onProgress({ stage: "validated", progress: 100 })
       }
 
+      console.log("validateJsonData: Validation successful")
       return { valid: true, data: validData }
     } catch (error) {
       console.error("Error validating JSON data:", error)
@@ -107,6 +135,85 @@ export class ImportService {
         error: `Error validating JSON data: ${error instanceof Error ? error.message : "Unknown error"}`,
       }
     }
+  }
+
+  /**
+   * Cleans JSON text to fix common issues
+   * @param jsonText Original JSON text
+   * @returns Cleaned JSON text
+   */
+  private static cleanJsonText(jsonText: string): string {
+    const cleanedText = jsonText
+      // Normalize whitespace
+      .replace(/\n/g, " ")
+      .replace(/\r/g, "")
+      .replace(/\t/g, " ")
+      // Remove trailing commas
+      .replace(/,\s*}/g, "}")
+      .replace(/,\s*]/g, "]")
+      // Fix multiple consecutive spaces
+      .replace(/\s+/g, " ")
+      // Remove invalid characters
+      .replace(/[^\x20-\x7E]/g, "")
+      // Handle invalid quotation marks
+      .replace(/[""'']/g, '"')
+      // Fix missing commas in object literals (risky but helpful in some cases)
+      .replace(/}(\s*){/g, "},{")
+      // Fix missing commas in arrays (risky but helpful in some cases)
+      .replace(/](\s*)\[/g, "],[")
+
+    return cleanedText
+  }
+
+  /**
+   * Sanitize guidelines text fields
+   * @param guidelines Guidelines to sanitize
+   * @returns Sanitized guidelines
+   */
+  private static sanitizeGuidelines(guidelines: any[]): Guideline[] {
+    return guidelines.map((guideline) => ({
+      ...guideline,
+      text: typeof guideline.text === "string" ? this.sanitizeDescription(guideline.text) : guideline.text,
+      justification:
+        typeof guideline.justification === "string"
+          ? this.sanitizeDescription(guideline.justification)
+          : guideline.justification,
+    })) as Guideline[]
+  }
+
+  /**
+   * Sanitize principles text fields
+   * @param principles Principles to sanitize
+   * @returns Sanitized principles
+   */
+  private static sanitizePrinciples(principles: any[]): Principle[] {
+    return principles.map((principle) => ({
+      ...principle,
+      description:
+        typeof principle.description === "string"
+          ? this.sanitizeDescription(principle.description)
+          : principle.description,
+      evidenz: typeof principle.evidenz === "string" ? this.sanitizeDescription(principle.evidenz) : principle.evidenz,
+      implikation:
+        typeof principle.implikation === "string"
+          ? this.sanitizeDescription(principle.implikation)
+          : principle.implikation,
+    })) as Principle[]
+  }
+
+  /**
+   * Removes surrounding quotes from a string
+   * @param text The text to sanitize
+   * @returns The sanitized text
+   */
+  static sanitizeDescription(text: string): string {
+    // Handle various types of quotation marks
+    if (text && typeof text === "string") {
+      const quotesRegex = /^["'“”‘’](.*)["'“”‘’]$/
+      const match = text.match(quotesRegex)
+      return match ? match[1] : text
+    }
+    return text
   }
 
   /**
@@ -122,6 +229,8 @@ export class ImportService {
     onProgress?: (progress: ImportProgress) => void,
   ): Promise<ImportResult> {
     try {
+      console.log("importData: Starting import", { options })
+
       // Report initial progress
       if (onProgress) {
         onProgress({ stage: "preparing", progress: 10 })
@@ -202,97 +311,12 @@ export class ImportService {
 
         // Intelligent merge of data
         console.log("Merging data...")
-        finalData = this.mergeData(currentData, filteredData)
+        finalData = ImportService.mergeData(currentData, filteredData)
         console.log("Data merged successfully")
       }
 
-      // Save the data with improved error handling
       try {
-        // Report progress
-        if (onProgress) {
-          onProgress({ stage: "saving", progress: 60 })
-        }
-
-        console.log("Saving data...")
-
-        let success = false
-
-        if (isLargeData) {
-          // For large data, use incremental saving
-          console.log("Using incremental saving for large data")
-
-          // Save guidelines in chunks
-          if (finalData.guidelines.length > 0) {
-            const chunkSize = 50
-            for (let i = 0; i < finalData.guidelines.length; i += chunkSize) {
-              const chunk = finalData.guidelines.slice(i, i + chunkSize)
-              console.log(
-                `Saving guidelines chunk ${i / chunkSize + 1}/${Math.ceil(finalData.guidelines.length / chunkSize)}`,
-              )
-
-              // Report progress
-              if (onProgress) {
-                onProgress({
-                  stage: "saving-guidelines",
-                  progress: 60 + (i / finalData.guidelines.length) * 20,
-                  message: `Saving guidelines chunk ${i / chunkSize + 1}/${Math.ceil(
-                    finalData.guidelines.length / chunkSize,
-                  )}`,
-                })
-              }
-
-              // Create a temporary data object with just this chunk
-              const chunkData = {
-                ...finalData,
-                guidelines: i === 0 ? chunk : [...(await storageService.loadData()).guidelines, ...chunk],
-                lastUpdated: new Date().toISOString(),
-              }
-
-              const chunkSuccess = await storageService.saveData(chunkData)
-              if (!chunkSuccess) {
-                throw new Error(`Failed to save guidelines chunk ${i / chunkSize + 1}`)
-              }
-            }
-          }
-
-          // Report progress
-          if (onProgress) {
-            onProgress({ stage: "saving-final", progress: 80 })
-          }
-
-          // Save the rest of the data (categories and principles)
-          const finalChunkData = {
-            ...(await storageService.loadData()),
-            categories: finalData.categories,
-            principles: finalData.principles,
-            lastUpdated: new Date().toISOString(),
-          }
-
-          success = await storageService.saveData(finalChunkData)
-        } else {
-          // For smaller data, save everything at once
-          success = await storageService.saveData(finalData)
-        }
-
-        // Report progress
-        if (onProgress) {
-          onProgress({ stage: "completed", progress: 100 })
-        }
-
-        console.log("Data saved successfully:", success)
-
-        if (success) {
-          return {
-            success: true,
-            stats: {
-              guidelines: filteredData.guidelines.length,
-              principles: filteredData.principles.length,
-              categories: filteredData.categories.length,
-            },
-          }
-        } else {
-          throw new Error(`Error ${options.replaceMode ? "replacing" : "saving"} imported data`)
-        }
+        return await ImportService.saveImportData(finalData, options, storageService, isLargeData, onProgress)
       } catch (saveError) {
         console.error("Error saving data during import:", saveError)
         return {
@@ -310,28 +334,172 @@ export class ImportService {
   }
 
   /**
-   * Merges two sets of data intelligently
-   * @param currentData Current data
-   * @param importData Data to import
-   * @returns Merged data
+   * Saves imported data with progress reporting
+   * @param finalData Data to save
+   * @param options Import options
+   * @param storageService Storage service instance
+   * @param isLargeData Whether data is large
+   * @param onProgress Progress callback
+   * @returns Import result
    */
-  static mergeData(currentData: StorageData, importData: StorageData): StorageData {
-    // Merge categories (simple, as they are just strings)
-    const mergedCategories = [...new Set([...currentData.categories, ...importData.categories])]
-
-    // Merge principles
-    const mergedPrinciples = this.mergePrinciples(currentData.principles, importData.principles)
-
-    // Merge guidelines
-    const mergedGuidelines = this.mergeGuidelines(currentData.guidelines, importData.guidelines)
-
-    return {
-      guidelines: mergedGuidelines,
-      categories: mergedCategories,
-      principles: mergedPrinciples,
-      lastUpdated: new Date().toISOString(),
-      version: "2.0",
+  private static async saveImportData(
+    finalData: StorageData,
+    options: ImportOptions,
+    storageService: any,
+    isLargeData: boolean,
+    onProgress?: (progress: ImportProgress) => void,
+  ): Promise<ImportResult> {
+    // Report progress
+    if (onProgress) {
+      onProgress({ stage: "saving", progress: 60 })
     }
+
+    console.log("Saving data...")
+
+    let success = false
+
+    if (isLargeData) {
+      // For large data, use incremental saving
+      success = await ImportService.saveDataIncrementally(finalData, storageService, onProgress)
+    } else {
+      // For smaller data, save everything at once
+      success = await storageService.saveData(finalData)
+    }
+
+    // Report progress
+    if (onProgress) {
+      onProgress({ stage: "completed", progress: 100 })
+    }
+
+    console.log("Data saved successfully:", success)
+
+    if (success) {
+      return {
+        success: true,
+        stats: {
+          guidelines: finalData.guidelines.length,
+          principles: finalData.principles.length,
+          categories: finalData.categories.length,
+        },
+      }
+    } else {
+      throw new Error(`Error ${options.replaceMode ? "replacing" : "saving"} imported data`)
+    }
+  }
+
+  /**
+   * Saves large data incrementally in chunks
+   * @param finalData Data to save
+   * @param storageService Storage service instance
+   * @param onProgress Progress callback
+   * @returns Success status
+   */
+  private static async saveDataIncrementally(
+    finalData: StorageData,
+    storageService: any,
+    onProgress?: (progress: ImportProgress) => void,
+  ): Promise<boolean> {
+    console.log("Using incremental saving for large data")
+
+    // Save guidelines in chunks
+    if (finalData.guidelines.length > 0) {
+      const chunkSize = 50
+      for (let i = 0; i < finalData.guidelines.length; i += chunkSize) {
+        const chunk = finalData.guidelines.slice(i, i + chunkSize)
+        const chunkNumber = i / chunkSize + 1
+        const totalChunks = Math.ceil(finalData.guidelines.length / chunkSize)
+        console.log(`Saving guidelines chunk ${chunkNumber}/${totalChunks}`)
+
+        // Report progress
+        if (onProgress) {
+          onProgress({
+            stage: "saving-guidelines",
+            progress: 60 + (i / finalData.guidelines.length) * 20,
+            message: `Saving guidelines chunk ${chunkNumber}/${totalChunks}`,
+          })
+        }
+
+        // Create a temporary data object with just this chunk
+        const chunkData = {
+          ...finalData,
+          guidelines: chunk,
+          lastUpdated: new Date().toISOString(),
+        }
+
+        try {
+          const chunkSuccess = await storageService.saveData(chunkData, true)
+          if (!chunkSuccess) {
+            throw new Error(`Failed to save guidelines chunk ${chunkNumber}: chunkSuccess=${chunkSuccess}`)
+          }
+        } catch (chunkSaveError) {
+          console.error(`Error saving guidelines chunk ${chunkNumber}:`, chunkSaveError)
+          throw new Error(
+            `Failed to save guidelines chunk ${chunkNumber}: ${
+              chunkSaveError instanceof Error ? chunkSaveError.message : "Unknown error"
+            }`,
+          )
+        }
+      }
+    }
+
+    // Report progress
+    if (onProgress) {
+      onProgress({ stage: "saving-final", progress: 80 })
+    }
+
+    // Save the rest of the data (categories and principles)
+    const finalChunkData = {
+      ...finalData,
+      guidelines: [], // Clear guidelines to avoid exceeding size limits
+    }
+
+    return await storageService.saveData(finalChunkData)
+  }
+
+  /**
+   * Generic merge function for entities with IDs
+   * @param existing Existing entities
+   * @param imported Entities to import
+   * @param defaultId ID generation function
+   * @param defaultValues Default values for missing attributes
+   * @param mergeStrategy Custom merge strategy function
+   * @returns Merged entities
+   */
+  private static mergeEntities<T extends { id: string }>(
+    existing: T[],
+    imported: T[],
+    defaultId: () => string,
+    defaultValues: Partial<T>,
+    mergeStrategy?: (existingEntity: T, importedEntity: T) => T,
+  ): T[] {
+    const result = [...existing]
+
+    imported.forEach((importedEntity) => {
+      // Check if entity already exists
+      const existingIndex = result.findIndex((e) => e.id === importedEntity.id)
+
+      if (existingIndex >= 0) {
+        // Use custom merge strategy if provided
+        if (mergeStrategy) {
+          result[existingIndex] = mergeStrategy(result[existingIndex], importedEntity)
+        } else {
+          // Default merge strategy: spread both objects with imported taking precedence
+          result[existingIndex] = {
+            ...result[existingIndex],
+            ...importedEntity,
+          }
+        }
+      } else {
+        // Add new entity with defaults
+        result.push({
+          id: importedEntity.id || defaultId(),
+          ...defaultValues,
+          ...importedEntity,
+        } as T)
+      }
+    })
+
+    return result
   }
 
   /**
@@ -340,39 +508,29 @@ export class ImportService {
    * @param imported Principles to import
    * @returns Merged principles
    */
-  static mergePrinciples(existing: any[], imported: any[]): any[] {
-    const result = [...existing]
-    const existingIds = new Set(existing.map((p) => p.id))
+  static mergePrinciples(existing: Principle[], imported: Principle[]): Principle[] {
+    const defaultId = () => `principle-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 
-    imported.forEach((importedPrinciple) => {
-      // Check if principle already exists
-      const existingIndex = result.findIndex((p) => p.id === importedPrinciple.id)
+    const defaultValues: Partial<Principle> = {
+      name: "Unnamed Principle",
+      description: "",
+      evidenz: "",
+      elements: [],
+    }
 
-      if (existingIndex >= 0) {
-        // Add missing attributes to existing principle
-        result[existingIndex] = {
-          ...result[existingIndex],
-          ...importedPrinciple,
-          // Ensure no attributes are lost
-          name: importedPrinciple.name || result[existingIndex].name,
-          description: importedPrinciple.description || result[existingIndex].description,
-          evidenz: importedPrinciple.evidenz || result[existingIndex].evidenz,
-          elements: importedPrinciple.elements || result[existingIndex].elements || [],
-        }
-      } else {
-        // Add new principle
-        result.push({
-          id: importedPrinciple.id || `principle-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          name: importedPrinciple.name || "Unnamed Principle",
-          description: importedPrinciple.description || "",
-          evidenz: importedPrinciple.evidenz || "",
-          elements: importedPrinciple.elements || [],
-          ...importedPrinciple,
-        })
+    const mergeStrategy = (existingPrinciple: Principle, importedPrinciple: Principle): Principle => {
+      return {
+        ...existingPrinciple,
+        ...importedPrinciple,
+        // Ensure no attributes are lost
+        name: importedPrinciple.name || existingPrinciple.name,
+        description: importedPrinciple.description || existingPrinciple.description,
+        evidenz: importedPrinciple.evidenz || existingPrinciple.evidenz,
+        elements: importedPrinciple.elements || existingPrinciple.elements || [],
       }
-    })
+    }
 
-    return result
+    return this.mergeEntities<Principle>(existing, imported, defaultId, defaultValues, mergeStrategy)
   }
 
   /**
@@ -381,44 +539,34 @@ export class ImportService {
    * @param imported Guidelines to import
    * @returns Merged guidelines
    */
-  static mergeGuidelines(existing: any[], imported: any[]): any[] {
-    const result = [...existing]
-    const existingIds = new Set(existing.map((g) => g.id))
+  static mergeGuidelines(existing: Guideline[], imported: Guideline[]): Guideline[] {
+    const defaultId = () => `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 
-    imported.forEach((importedGuideline) => {
-      // Check if guideline already exists
-      const existingIndex = result.findIndex((g) => g.id === importedGuideline.id)
+    const defaultValues: Partial<Guideline> = {
+      title: "Unnamed Guideline",
+      text: "",
+      justification: "",
+      categories: [],
+      principles: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
 
-      if (existingIndex >= 0) {
-        // Add missing attributes to existing guideline
-        result[existingIndex] = {
-          ...result[existingIndex],
-          ...importedGuideline,
-          // Ensure no attributes are lost
-          title: importedGuideline.title || result[existingIndex].title,
-          text: importedGuideline.text || result[existingIndex].text,
-          justification: importedGuideline.justification || result[existingIndex].justification,
-          categories: importedGuideline.categories || result[existingIndex].categories || [],
-          principles: importedGuideline.principles || result[existingIndex].principles || [],
-          updatedAt: new Date().toISOString(),
-        }
-      } else {
-        // Add new guideline with default values for missing attributes
-        result.push({
-          id: importedGuideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          title: importedGuideline.title || "Unnamed Guideline",
-          text: importedGuideline.text || "",
-          justification: importedGuideline.justification || "",
-          categories: importedGuideline.categories || [],
-          principles: importedGuideline.principles || [],
-          createdAt: importedGuideline.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          ...importedGuideline,
-        })
+    const mergeStrategy = (existingGuideline: Guideline, importedGuideline: Guideline): Guideline => {
+      return {
+        ...existingGuideline,
+        ...importedGuideline,
+        // Ensure no attributes are lost
+        title: importedGuideline.title || existingGuideline.title,
+        text: importedGuideline.text || existingGuideline.text,
+        justification: importedGuideline.justification || existingGuideline.justification,
+        categories: importedGuideline.categories || existingGuideline.categories || [],
+        principles: importedGuideline.principles || existingGuideline.principles || [],
+        updatedAt: new Date().toISOString(),
       }
-    })
+    }
 
-    return result
+    return this.mergeEntities<Guideline>(existing, imported, defaultId, defaultValues, mergeStrategy)
   }
 
   /**
@@ -435,7 +583,7 @@ export class ImportService {
       const currentData = await storageService.loadData()
 
       // Merge principles
-      const mergedPrinciples = this.mergePrinciples(currentData.principles, principles)
+      const mergedPrinciples = ImportService.mergePrinciples(currentData.principles, principles)
 
       // Save the updated data
       const success = await storageService.saveData({
@@ -526,6 +674,25 @@ export class ImportService {
         success: false,
         error: `Error importing principle elements: ${error instanceof Error ? error.message : "Unknown error"}`,
       }
+    }
+  }
+
+  /**
+   * Merges two StorageData objects, giving priority to the imported data
+   * @param currentData The current StorageData
+   * @param filteredData The imported StorageData
+   * @returns The merged StorageData
+   */
+  private static mergeData(currentData: StorageData, filteredData: StorageData): StorageData {
+    const mergedGuidelines = ImportService.mergeGuidelines(currentData.guidelines, filteredData.guidelines)
+    const mergedPrinciples = ImportService.mergePrinciples(currentData.principles, filteredData.principles)
+
+    return {
+      guidelines: mergedGuidelines,
+      categories: [...new Set([...currentData.categories, ...filteredData.categories])],
+      principles: mergedPrinciples,
+      lastUpdated: new Date().toISOString(),
+      version: "2.0",
     }
   }
 }
