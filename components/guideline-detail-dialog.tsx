@@ -1,120 +1,147 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { BookOpen } from "lucide-react"
-import type { Guideline } from "@/types/guideline"
-import { useAppContext } from "@/contexts/app-context"
+import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Pencil, Trash2 } from "lucide-react"
+import type { Guideline, Principle } from "@/types/guideline"
+import { Separator } from "@/components/ui/separator"
+import { Title } from "@/components/ui/typography"
 
 interface GuidelineDetailDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   guideline: Guideline | null
-  isOpen: boolean
-  onClose: () => void
+  principles: Principle[]
+  isAuthenticated: boolean
+  onEdit: (guideline: Guideline) => void
+  onDelete: (id: string) => void
+  onCategorySelect: (category: string) => void
 }
 
-export function GuidelineDetailDialog({ guideline, isOpen, onClose }: GuidelineDetailDialogProps) {
-  const { state } = useAppContext()
-
+export function GuidelineDetailDialog({
+  open,
+  onOpenChange,
+  guideline,
+  principles,
+  isAuthenticated,
+  onEdit,
+  onDelete,
+  onCategorySelect,
+}: GuidelineDetailDialogProps) {
   if (!guideline) return null
 
-  // Funktion zum Abrufen des Kategorienamens anhand der ID
-  const getCategoryName = (categoryId: string) => {
-    const category = state.categories.find((cat) => cat.id === categoryId)
-    return category ? category.name : categoryId
-  }
-
-  // Funktion zum Abrufen des Prinzips anhand der ID
-  const getPrinciple = (principleId: string) => {
-    return state.principles.find((p) => p.id === principleId)
-  }
+  // Finde die Prinzipien, die dieser Guideline zugeordnet sind
+  const guidelinePrinciples = principles.filter((principle) => guideline.principles.includes(principle.id))
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">{guideline.title}</DialogTitle>
+          <Title className="text-2xl font-bold">{guideline.title}</Title>
+          <p className="text-sm text-muted-foreground">
+            Erstellt am {new Date(guideline.createdAt).toLocaleDateString()} • Aktualisiert am{" "}
+            {new Date(guideline.updatedAt).toLocaleDateString()}
+          </p>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-          {/* Bild oder SVG anzeigen, falls vorhanden */}
-          {(guideline.detailSvgContent || guideline.detailImageUrl || guideline.svgContent || guideline.imageUrl) && (
-            <div className="bg-muted/30 rounded-md overflow-hidden flex justify-center items-center p-4">
-              {guideline.detailSvgContent ? (
+        <div className="space-y-6 py-4">
+          {/* Bild/SVG */}
+          {(guideline.svgContent || guideline.imageUrl) && (
+            <div className="flex justify-center mb-4">
+              {guideline.svgContent ? (
                 <div
-                  dangerouslySetInnerHTML={{ __html: guideline.detailSvgContent }}
-                  className="w-full max-h-[300px]"
+                  className="w-48 h-48 bg-white rounded border"
+                  dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
                 />
-              ) : guideline.detailImageUrl ? (
-                <img
-                  src={guideline.detailImageUrl || "/placeholder.svg"}
-                  alt={guideline.title}
-                  className="max-h-[300px] object-contain"
-                />
-              ) : guideline.svgContent ? (
-                <div dangerouslySetInnerHTML={{ __html: guideline.svgContent }} className="w-full max-h-[300px]" />
-              ) : guideline.imageUrl ? (
+              ) : (
                 <img
                   src={guideline.imageUrl || "/placeholder.svg"}
                   alt={guideline.title}
-                  className="max-h-[300px] object-contain"
+                  className="w-48 h-48 object-contain bg-white rounded border"
                 />
-              ) : null}
+              )}
             </div>
           )}
 
-          {/* Guideline-Text */}
+          {/* Guideline Text */}
           <div>
-            <h3 className="text-sm font-medium mb-1">Guideline</h3>
-            <p className="text-sm">{guideline.text}</p>
+            <h3 className="text-lg font-semibold mb-2">Guideline</h3>
+            <p>{guideline.text}</p>
           </div>
 
+          <Separator />
+
           {/* Begründung */}
-          {guideline.justification && (
-            <div>
-              <h3 className="text-sm font-medium mb-1">Begründung</h3>
-              <p className="text-sm">{guideline.justification}</p>
-            </div>
-          )}
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Begründung</h3>
+            <p>{guideline.justification}</p>
+          </div>
+
+          <Separator />
+
+          {/* Psychologische Prinzipien */}
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Psychologische Prinzipien</h3>
+            {guidelinePrinciples.length > 0 ? (
+              <div className="space-y-2">
+                {guidelinePrinciples.map((principle) => (
+                  <p key={principle.id}>{principle.description}</p>
+                ))}
+              </div>
+            ) : (
+              <p>Keine psychologischen Prinzipien zugeordnet.</p>
+            )}
+          </div>
+
+          <Separator />
 
           {/* Kategorien */}
           <div>
-            <h3 className="text-sm font-medium mb-2">Kategorien</h3>
+            <h3 className="text-lg font-semibold mb-2">Kategorien</h3>
             <div className="flex flex-wrap gap-2">
-              {guideline.categories.map((categoryId) => (
-                <Badge key={categoryId} variant="outline">
-                  {getCategoryName(categoryId)}
-                </Badge>
+              {guideline.categories.map((category) => (
+                <span
+                  key={category}
+                  className="px-2 py-1 bg-gray-100 rounded text-sm cursor-pointer"
+                  onClick={() => onCategorySelect(category)}
+                >
+                  {category}
+                </span>
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Psychologische Prinzipien */}
-          {guideline.principles && guideline.principles.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium mb-2 flex items-center">
-                <BookOpen size={14} className="mr-1" />
-                Psychologische Prinzipien
-              </h3>
-              <div className="space-y-2">
-                {guideline.principles.map((principleId) => {
-                  const principle = getPrinciple(principleId)
-                  return principle ? (
-                    <div key={principleId} className="bg-muted/30 p-3 rounded-md">
-                      <h4 className="font-medium text-sm">{principle.name}</h4>
-                      <p className="text-xs text-muted-foreground mt-1">{principle.description}</p>
-                    </div>
-                  ) : null
-                })}
-              </div>
+        {/* Footer mit Aktionen */}
+        <DialogFooter className="border-t pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Schließen
+          </Button>
+          {isAuthenticated && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onEdit(guideline)
+                  onOpenChange(false)
+                }}
+              >
+                <Pencil size={16} className="mr-2" />
+                Bearbeiten
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onDelete(guideline.id)
+                  onOpenChange(false)
+                }}
+              >
+                <Trash2 size={16} className="mr-2" />
+                Löschen
+              </Button>
             </div>
           )}
-
-          {/* Metadaten */}
-          <div className="text-xs text-muted-foreground pt-2">
-            <p>Erstellt: {new Date(guideline.createdAt).toLocaleDateString()}</p>
-            <p>Aktualisiert: {new Date(guideline.updatedAt).toLocaleDateString()}</p>
-          </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { ImportService, type ImportOptions } from "@/services/import-service"
 import { DialogTitleText, DialogDescriptionText, SmallText, SectionTitle } from "@/components/ui/typography"
-import { Input } from "@/components/ui/input"
 
 interface UnifiedImportDialogProps {
   open: boolean
@@ -27,7 +26,6 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
   const [fileName, setFileName] = useState<string | null>(null)
   const [importProgress, setImportProgress] = useState(0)
   const [progressMessage, setProgressMessage] = useState<string>("")
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const [importOptions, setImportOptions] = useState<ImportOptions>({
@@ -35,7 +33,6 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     principles: true,
     categories: true,
     replaceMode: false,
-    batchSize: 100, // Standard-Batch-Größe
   })
   const [content, setContent] = useState<string | null>(null)
 
@@ -45,13 +42,11 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     setFileName(null)
     setImportProgress(0)
     setProgressMessage("")
-    setBatchProgress(null)
     setImportOptions({
       guidelines: true,
       principles: true,
       categories: true,
       replaceMode: false,
-      batchSize: 100,
     })
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
@@ -90,7 +85,6 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
     setError(null)
     setImportProgress(10)
     setProgressMessage("Starting import...")
-    setBatchProgress(null)
 
     try {
       // Validate the JSON data
@@ -115,21 +109,10 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
         {
           ...importOptions,
           replaceMode: importOptions.replaceMode,
-          batchSize: importOptions.batchSize,
         },
         (progress) => {
           setImportProgress(30 + progress.progress * 0.7) // 30-100% progress for import
           setProgressMessage(progress.message || progress.stage)
-
-          // Aktualisiere Batch-Fortschritt, wenn verfügbar
-          if (progress.currentBatch && progress.totalBatches) {
-            setBatchProgress({
-              current: progress.currentBatch,
-              total: progress.totalBatches,
-            })
-          } else {
-            setBatchProgress(null)
-          }
         },
       )
 
@@ -143,7 +126,7 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
             importResult.stats?.guidelines || 0
           } guidelines, ${importResult.stats?.categories || 0} categories, ${
             importResult.stats?.principles || 0
-          } principles. ${importResult.stats?.newCategories ? `Created ${importResult.stats.newCategories} new categories.` : ""}`,
+          } principles.`,
         })
 
         resetState()
@@ -162,7 +145,6 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
       setError(`Import failed: ${err instanceof Error ? err.message : "Unknown error"}`)
       setImportProgress(0)
       setProgressMessage("")
-      setBatchProgress(null)
     } finally {
       setIsImporting(false)
     }
@@ -279,28 +261,6 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="batch-size">Batch Size (for large imports)</Label>
-                <Input
-                  id="batch-size"
-                  type="number"
-                  min="10"
-                  max="500"
-                  value={importOptions.batchSize}
-                  onChange={(e) =>
-                    setImportOptions((prev) => ({
-                      ...prev,
-                      batchSize: Math.max(10, Math.min(500, Number.parseInt(e.target.value) || 100)),
-                    }))
-                  }
-                  disabled={isImporting}
-                  className="w-32"
-                />
-                <SmallText className="text-muted-foreground">
-                  Recommended: 50-100 for normal imports, 20-50 for very large imports
-                </SmallText>
-              </div>
-
               <SmallText className="text-muted-foreground">
                 {fileName ? "Ready to import data from the selected file." : "Please select a JSON file to import."}
               </SmallText>
@@ -322,15 +282,6 @@ export function UnifiedImportDialog({ open, onOpenChange, onSuccess }: UnifiedIm
                 <SmallText className="text-muted-foreground">
                   {isImporting ? `Importing... ${progressMessage}` : progressMessage}
                 </SmallText>
-
-                {batchProgress && (
-                  <div className="mt-2">
-                    <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-1 bg-gray-100" />
-                    <SmallText className="text-muted-foreground mt-1">
-                      Batch {batchProgress.current} of {batchProgress.total}
-                    </SmallText>
-                  </div>
-                )}
               </div>
             )}
           </div>
