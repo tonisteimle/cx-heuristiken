@@ -19,3 +19,25 @@ export const FIXED_CATEGORIES = [
   "Maintenance",
   "Support",
 ]
+
+// Mapping für vereinfachte Navigationstitel
+export const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
+  "Produktsuche und -auswahl": "Produktsuche",
+  Produktdarstellung: "Darstellung",
+  Produktkonfiguration: "Konfiguration",
+  "Check-out": "Check-out",
+  "After Sales": "After Sales",
+  "Lead Generation & Qualifizierung": "Lead Generation",
+  "Discovery & Bedarfsanalyse": "Discovery",
+  "Lösungskonzeption & Angebotserstellung": "Lösungskonzeption",
+  "Vertrags- & Procurement-Prozess": "Vertragsprozess",
+  "Projekt-Kick-off & Onboarding": "Onboarding",
+  "Service-Delivery & Betrieb": "Service-Delivery",
+  "Training & Enablement": "Training",
+  "Account-Management & Customer Success": "Account-Management",
+  "Abrechnung & Billing": "Abrechnung",
+  "Contract Renewal & Expansion": "Renewal",
+  "Offboarding & Transition": "Offboarding",
+  Maintenance: "Wartung",
+  Support: "Support",
+}

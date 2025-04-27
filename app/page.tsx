@@ -341,9 +341,11 @@ function GuidelinesManager() {
             {activeTab === "guidelines" && !state.isLoading && (
               <CategorySidebar
                 selectedCategory={selectedCategory}
-                onChange={setSelectedCategory}
+                onSelectCategory={setSelectedCategory}
+                categories={state.categories}
                 categoryCount={categoryCount}
-                className="fixed left-0 top-[164px] bottom-0 z-40"
+                totalCount={state.guidelines.length}
+                className="top-[164px]"
               />
             )}
 
