@@ -17,6 +17,7 @@ const guidelineSchema = {
     updatedAt: { type: "string" },
     imageUrl: { type: "string", nullable: true },
     svgContent: { type: "string", nullable: true },
+    detailSvgContent: { type: "string", nullable: true },
   },
   // Wir entfernen die required-Validierung, um flexibler zu sein
   additionalProperties: true,
@@ -60,6 +61,14 @@ async function saveGuidelineHandler(data: any, supabase: any) {
       ...(guideline.justification ? { justification: String(guideline.justification) } : {}),
       ...(guideline.imageUrl ? { imageUrl: String(guideline.imageUrl) } : {}),
       ...(guideline.svgContent ? { svgContent: String(guideline.svgContent) } : {}),
+      ...(guideline.detailSvgContent ? { detailSvgContent: String(guideline.detailSvgContent) } : {}),
+    }
+
+    // Log SVG content for debugging
+    if (guideline.svgContent) {
+      console.log(`Guideline ${guideline.id} hat SVG-Inhalt: ${guideline.svgContent.substring(0, 50)}...`)
+    } else {
+      console.log(`Guideline ${guideline.id} hat KEINEN SVG-Inhalt`)
     }
 
     // Validiere die Guideline gegen das Schema
@@ -95,9 +104,24 @@ async function saveGuidelineHandler(data: any, supabase: any) {
     // Aktualisiere oder füge die Guideline hinzu
     let updatedGuidelines
     if (index >= 0) {
+      // Guideline existiert bereits, aktualisiere sie
       updatedGuidelines = [...currentGuidelines]
+      const existingGuideline = updatedGuidelines[index]
+
+      // Stelle sicher, dass SVG-Inhalte nicht verloren gehen
+      if (!guideline.svgContent && existingGuideline.svgContent) {
+        console.log(`Behalte bestehenden SVG-Inhalt für Guideline ${guideline.id}`)
+        guideline.svgContent = existingGuideline.svgContent
+      }
+
+      if (!guideline.detailSvgContent && existingGuideline.detailSvgContent) {
+        console.log(`Behalte bestehenden Detail-SVG-Inhalt für Guideline ${guideline.id}`)
+        guideline.detailSvgContent = existingGuideline.detailSvgContent
+      }
+
       updatedGuidelines[index] = guideline
     } else {
+      // Neue Guideline, füge sie hinzu
       updatedGuidelines = [...currentGuidelines, guideline]
     }
 

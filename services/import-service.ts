@@ -17,6 +17,7 @@ export interface ImportResult {
     guidelines: number
     principles: number
     categories: number
+    svgCount?: number
   }
 }
 
@@ -93,6 +94,23 @@ export class ImportService {
         }
       }
 
+      // Zähle SVGs in den importierten Daten
+      let svgCount = 0
+      if (Array.isArray(parsedData.guidelines)) {
+        for (const guideline of parsedData.guidelines) {
+          if (guideline && guideline.svgContent) {
+            svgCount++
+            // Überprüfe, ob das SVG gültig ist
+            if (!guideline.svgContent.trim().startsWith("<svg") && !guideline.svgContent.trim().startsWith("<?xml")) {
+              console.warn(
+                `Ungültiges SVG-Format in Guideline ${guideline.id || "unknown"}: ${guideline.svgContent.substring(0, 50)}...`,
+              )
+            }
+          }
+        }
+      }
+      console.log(`Gefundene SVGs in importierten Daten: ${svgCount}`)
+
       // Prepare data for import
       const importData: StorageData = {
         guidelines: options.guidelines && Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
@@ -106,6 +124,7 @@ export class ImportService {
         guidelinesCount: importData.guidelines.length,
         categoriesCount: importData.categories.length,
         principlesCount: importData.principles.length,
+        svgCount: svgCount,
       })
 
       // Process and save data
@@ -162,10 +181,28 @@ export class ImportService {
             onProgress({ stage: "processing-guidelines", progress: 50, message: "Processing guidelines..." })
           }
 
+          let processedSvgCount = 0
+          let preservedSvgCount = 0
+
+          // Lade alle bestehenden Guidelines, um SVG-Inhalte zu erhalten
+          const existingGuidelines: Record<string, Guideline> = {}
+          if (currentData && Array.isArray(currentData.guidelines)) {
+            for (const guideline of currentData.guidelines) {
+              if (guideline && guideline.id) {
+                existingGuidelines[guideline.id] = guideline
+              }
+            }
+          }
+
+          console.log(`Gefundene bestehende Guidelines: ${Object.keys(existingGuidelines).length}`)
+
           for (let i = 0; i < importData.guidelines.length; i++) {
             const guideline = importData.guidelines[i]
 
             try {
+              // Prüfe, ob eine bestehende Guideline mit dieser ID existiert
+              const existingGuideline = guideline.id ? existingGuidelines[guideline.id] : null
+
               // Ensure guideline has required fields
               const processedGuideline: Guideline = {
                 id: guideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -175,10 +212,49 @@ export class ImportService {
                 principles: Array.isArray(guideline.principles) ? guideline.principles : [],
                 createdAt: guideline.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                // Preserve SVG content if present
-                ...(guideline.svgContent ? { svgContent: guideline.svgContent } : {}),
-                ...(guideline.imageUrl ? { imageUrl: guideline.imageUrl } : {}),
-                ...(guideline.justification ? { justification: guideline.justification } : {}),
+                // SVG-Inhalte mit Priorität behandeln:
+                // 1. Wenn die importierte Guideline SVG-Inhalte hat, verwende diese
+                // 2. Wenn nicht und eine bestehende Guideline existiert, behalte deren SVG-Inhalte
+                // 3. Ansonsten keine SVG-Inhalte
+                ...(guideline.svgContent
+                  ? { svgContent: guideline.svgContent }
+                  : existingGuideline?.svgContent
+                    ? { svgContent: existingGuideline.svgContent }
+                    : {}),
+
+                ...(guideline.detailSvgContent
+                  ? { detailSvgContent: guideline.detailSvgContent }
+                  : existingGuideline?.detailSvgContent
+                    ? { detailSvgContent: existingGuideline.detailSvgContent }
+                    : {}),
+
+                // Ähnlich für imageUrl und justification
+                ...(guideline.imageUrl
+                  ? { imageUrl: guideline.imageUrl }
+                  : existingGuideline?.imageUrl
+                    ? { imageUrl: existingGuideline.imageUrl }
+                    : {}),
+
+                ...(guideline.justification
+                  ? { justification: guideline.justification }
+                  : existingGuideline?.justification
+                    ? { justification: existingGuideline.justification }
+                    : {}),
+              }
+
+              // Zähle SVGs
+              if (processedGuideline.svgContent) {
+                if (guideline.svgContent) {
+                  processedSvgCount++
+                  console.log(
+                    `Guideline ${i + 1} hat neuen SVG-Inhalt: ${processedGuideline.svgContent.substring(0, 50)}...`,
+                  )
+                } else if (existingGuideline?.svgContent) {
+                  preservedSvgCount++
+                  console.log(
+                    `Guideline ${i + 1} behält bestehenden SVG-Inhalt: ${processedGuideline.svgContent.substring(0, 50)}...`,
+                  )
+                }
               }
 
               // Save guideline via API
@@ -215,6 +291,9 @@ export class ImportService {
               })
             }
           }
+
+          console.log(`Verarbeitete SVGs: ${processedSvgCount} von ${importData.guidelines.length} Guidelines`)
+          console.log(`Beibehaltene SVGs: ${preservedSvgCount} von ${importData.guidelines.length} Guidelines`)
         }
 
         // Process principles and categories via API
@@ -277,6 +356,7 @@ export class ImportService {
           guidelines: importData.guidelines.length,
           principles: importData.principles.length,
           categories: importData.categories.length,
+          svgCount: svgCount,
         },
       }
     } catch (error) {
@@ -342,6 +422,17 @@ export class ImportService {
         version: parsedData.version || "2.0",
       }
 
+      // Zähle SVGs in den validierten Daten
+      let svgCount = 0
+      if (Array.isArray(validData.guidelines)) {
+        for (const guideline of validData.guidelines) {
+          if (guideline && guideline.svgContent) {
+            svgCount++
+          }
+        }
+      }
+      console.log(`Gefundene SVGs in validierten Daten: ${svgCount}`)
+
       // Check if at least one of the arrays contains data
       if (validData.guidelines.length === 0 && validData.categories.length === 0 && validData.principles.length === 0) {
         console.warn("validateJsonData: No importable data found")
@@ -360,6 +451,7 @@ export class ImportService {
         guidelinesCount: validData.guidelines.length,
         categoriesCount: validData.categories.length,
         principlesCount: validData.principles.length,
+        svgCount: svgCount,
       })
 
       return { valid: true, data: validData }

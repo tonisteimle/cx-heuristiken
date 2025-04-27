@@ -52,6 +52,27 @@ export function GuidelineDetailDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* SVG-Anzeige */}
+          {guideline.svgContent && (
+            <div className="mb-6 flex justify-center">
+              <div
+                className="w-64 h-64 bg-white rounded-md p-4 border"
+                dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
+              />
+            </div>
+          )}
+
+          {/* Alternativ, wenn kein SVG vorhanden ist, aber ein Bild */}
+          {!guideline.svgContent && guideline.imageUrl && (
+            <div className="mb-6 flex justify-center">
+              <img
+                src={guideline.imageUrl || "/placeholder.svg"}
+                alt={guideline.title}
+                className="w-64 h-64 object-contain bg-white rounded-md p-4 border"
+              />
+            </div>
+          )}
+
           {/* Guideline-Text mit grünem Rand links */}
           <div className="border-l-4 border-[#62b4b0] bg-muted/20 p-4">
             <div className="mb-1">
@@ -131,6 +152,11 @@ export function GuidelineDetailDialog({
                 <Trash2 size={16} />
                 Löschen
               </Button>
+            </div>
+          )}
+          {guideline.svgContent && (
+            <div className="text-xs text-muted-foreground mt-2">
+              SVG vorhanden: {guideline.svgContent.length} Zeichen
             </div>
           )}
         </DialogFooter>

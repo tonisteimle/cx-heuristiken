@@ -64,8 +64,8 @@
     "@mui/material": "latest",
     "@mui/icons-material": "latest",
     "@supabase/supabase-js": "latest",
-    "ajv": "latest",
-    "uuid": "latest"
+    "uuid": "latest",
+    "ajv": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

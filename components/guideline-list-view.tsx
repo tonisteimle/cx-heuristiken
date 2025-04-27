@@ -44,6 +44,24 @@ export default function GuidelineListView({
           </CardHeader>
           <CardContent className="pt-4">
             <div className="space-y-4">
+              {guideline.svgContent && (
+                <div className="mb-4 flex justify-center">
+                  <div
+                    className="w-32 h-32 bg-white rounded-md p-2 border"
+                    dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
+                  />
+                </div>
+              )}
+
+              {!guideline.svgContent && guideline.imageUrl && (
+                <div className="mb-4 flex justify-center">
+                  <img
+                    src={guideline.imageUrl || "/placeholder.svg"}
+                    alt={guideline.title}
+                    className="w-32 h-32 object-contain bg-white rounded-md p-2 border"
+                  />
+                </div>
+              )}
               <div>
                 <LabelText className="mb-2">Guideline</LabelText>
                 <BodyText>{guideline.text}</BodyText>
@@ -101,6 +119,9 @@ export default function GuidelineListView({
                   <Trash2 size={14} />
                 </Button>
               </div>
+              {isAuthenticated && guideline.svgContent && (
+                <div className="text-xs text-muted-foreground">SVG: {guideline.svgContent.substring(0, 20)}...</div>
+              )}
             </CardFooter>
           )}
         </Card>
