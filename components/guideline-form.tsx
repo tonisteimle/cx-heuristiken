@@ -16,6 +16,7 @@ import { FixedCategorySelector } from "@/components/fixed-category-selector"
 import { ItemSelector } from "@/components/item-selector"
 import { FIXED_CATEGORIES } from "@/lib/constants"
 import { SectionTitle, MutedText, LabelText } from "@/components/ui/typography"
+import { useAppContext } from "@/contexts/app-context"
 
 interface GuidelineFormProps {
   existingCategories: string[]
@@ -44,6 +45,7 @@ export default function GuidelineForm({
   const [svgContent, setSvgContent] = useState<string | undefined>(undefined)
   const [detailSvgContent, setDetailSvgContent] = useState<string | undefined>(undefined)
   const { toast } = useToast()
+  const { state } = useAppContext()
 
   // Load initial data if editing
   useEffect(() => {
@@ -234,6 +236,7 @@ export default function GuidelineForm({
       <Separator className="my-6" />
 
       {/* Verwende die aktualisierte FixedCategorySelector mit Mehrfachauswahl */}
+      {/* <FixedCategorySelector selectedCategories={selectedCategories} onChange={setSelectedCategories} /> */}
       <FixedCategorySelector selectedCategories={selectedCategories} onChange={setSelectedCategories} />
 
       <div className="space-y-4">

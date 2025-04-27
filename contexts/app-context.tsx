@@ -9,10 +9,14 @@ import type { StorageData } from "@/types/storage-data"
 // Fügen Sie diesen Import am Anfang der Datei hinzu
 import { FIXED_CATEGORIES } from "@/lib/constants"
 
+// Importieren Sie den Category-Typ
+import type { Category } from "@/types/category"
+
 // State types
+// Ändern Sie die AppState-Schnittstelle, um den neuen Kategorietyp zu verwenden
 interface AppState {
   guidelines: Guideline[]
-  categories: string[]
+  categories: Category[] // Ändern von string[] zu Category[]
   principles: Principle[]
   isLoaded: boolean
   isLoading: boolean
@@ -25,6 +29,7 @@ interface AppState {
 }
 
 // Action types
+// Fügen Sie neue Aktionen für Kategorien hinzu
 type AppAction =
   | { type: "LOADING" }
   | { type: "LOAD_DATA_SUCCESS"; payload: StorageData; stats?: any }
@@ -35,8 +40,12 @@ type AppAction =
   | { type: "SAVE_PRINCIPLES"; payload: Principle[] }
   | { type: "IMPORT_DATA"; payload: StorageData }
   | { type: "UPDATE_STATS"; payload: any }
+  | { type: "ADD_CATEGORY"; payload: Category }
+  | { type: "UPDATE_CATEGORY"; payload: Category }
+  | { type: "DELETE_CATEGORY"; payload: string }
 
 // Context type
+// Erweitern Sie die AppContextType-Schnittstelle um die neuen Kategoriefunktionen
 interface AppContextType {
   state: AppState
   addGuideline: (guideline: Guideline) => Promise<void>
@@ -46,6 +55,9 @@ interface AppContextType {
   exportData: (options?: ExportOptions) => Promise<boolean>
   refreshData: () => Promise<void>
   batchUpdateGuidelines: (guidelines: Guideline[]) => Promise<void>
+  addCategory: (category: Partial<Category>) => Promise<void>
+  updateCategory: (category: Category) => Promise<void>
+  deleteCategory: (id: string) => Promise<void>
 }
 
 interface ExportOptions {
@@ -72,6 +84,7 @@ const initialState: AppState = {
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 // Reducer function
+// Fügen Sie die Kategorie-Reducer-Fälle hinzu
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "LOADING":
@@ -153,12 +166,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         stats: action.payload,
       }
+    case "ADD_CATEGORY":
+      return {
+        ...state,
+        categories: [...state.categories, action.payload],
+      }
+    case "UPDATE_CATEGORY":
+      return {
+        ...state,
+        categories: state.categories.map((c) => (c.id === action.payload.id ? action.payload : c)),
+      }
+    case "DELETE_CATEGORY":
+      return {
+        ...state,
+        categories: state.categories.filter((c) => c.id !== action.payload),
+      }
     default:
       return state
   }
 }
 
 // Provider component
+// Implementieren Sie die Kategoriefunktionen im Provider
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState)
   const { toast } = useToast()
@@ -534,7 +563,140 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Neue Funktionen für Kategorien
+  const addCategory = async (categoryData: Partial<Category>) => {
+    try {
+      const newCategory: Category = {
+        id: Date.now().toString(),
+        name: categoryData.name || "Neue Kategorie",
+        description: categoryData.description || "",
+        svgContent: categoryData.svgContent || "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+
+      dispatch({ type: "ADD_CATEGORY", payload: newCategory })
+
+      // Save to database
+      const storageService = getStorageService()
+      const data: StorageData = {
+        guidelines: state.guidelines,
+        categories: [...state.categories, newCategory],
+        principles: state.principles,
+        lastUpdated: new Date().toISOString(),
+        version: "2.0",
+      }
+
+      const success = await storageService.saveData(data)
+
+      if (success) {
+        toast({
+          title: "Category added",
+          description: "Your category has been successfully saved to the database.",
+        })
+
+        // Update stats
+        const stats = await storageService.getStats()
+        dispatch({ type: "UPDATE_STATS", payload: stats })
+      } else {
+        throw new Error("Failed to save category to database")
+      }
+    } catch (error) {
+      console.error("Error adding category:", error)
+
+      toast({
+        title: "Error adding category",
+        description: "There was a problem adding your category. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateCategory = async (category: Category) => {
+    try {
+      const updatedCategory = {
+        ...category,
+        updatedAt: new Date().toISOString(),
+      }
+
+      dispatch({ type: "UPDATE_CATEGORY", payload: updatedCategory })
+
+      // Save to database
+      const storageService = getStorageService()
+      const data: StorageData = {
+        guidelines: state.guidelines,
+        categories: state.categories.map((c) => (c.id === category.id ? updatedCategory : c)),
+        principles: state.principles,
+        lastUpdated: new Date().toISOString(),
+        version: "2.0",
+      }
+
+      const success = await storageService.saveData(data)
+
+      if (success) {
+        toast({
+          title: "Category updated",
+          description: "Your category has been successfully updated in the database.",
+        })
+
+        // Update stats
+        const stats = await storageService.getStats()
+        dispatch({ type: "UPDATE_STATS", payload: stats })
+      } else {
+        throw new Error("Failed to update category in database")
+      }
+    } catch (error) {
+      console.error("Error updating category:", error)
+
+      toast({
+        title: "Error updating category",
+        description: "There was a problem updating your category. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteCategory = async (id: string) => {
+    try {
+      dispatch({ type: "DELETE_CATEGORY", payload: id })
+
+      // Save to database
+      const storageService = getStorageService()
+      const data: StorageData = {
+        guidelines: state.guidelines,
+        categories: state.categories.filter((c) => c.id !== id),
+        principles: state.principles,
+        lastUpdated: new Date().toISOString(),
+        version: "2.0",
+      }
+
+      const success = await storageService.saveData(data)
+
+      if (success) {
+        toast({
+          title: "Category deleted",
+          description: "Your category has been successfully deleted from the database.",
+        })
+
+        // Update stats
+        const stats = await storageService.getStats()
+        dispatch({ type: "UPDATE_STATS", payload: stats })
+      } else {
+        throw new Error("Failed to delete category from database")
+      }
+    } catch (error) {
+      console.error("Error deleting category:", error)
+
+      toast({
+        title: "Error deleting category",
+        description: "There was a problem deleting your category. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Context value
+  // Fügen Sie die neuen Funktionen zum contextValue hinzu
   const contextValue: AppContextType = {
     state,
     addGuideline,
@@ -544,6 +706,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     exportData,
     refreshData,
     batchUpdateGuidelines,
+    addCategory,
+    updateCategory,
+    deleteCategory,
   }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
