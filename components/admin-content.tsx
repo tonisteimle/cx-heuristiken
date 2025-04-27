@@ -13,8 +13,7 @@ export default function AdminContent() {
     {
       title: "Prinzipien verwalten",
       description: "Theoretische Prinzipien verwalten",
-      href: "/",
-      query: { showPrinciples: "true" },
+      href: "/?showPrinciples=true",
     },
     {
       title: "Kategorien verwalten",
@@ -29,14 +28,12 @@ export default function AdminContent() {
     {
       title: "Daten importieren",
       description: "Neue Daten zu bestehenden hinzufügen",
-      href: "/",
-      query: { showImport: "true" },
+      href: "/?showImport=true",
     },
     {
       title: "Daten exportieren",
       description: "Daten als JSON-Datei herunterladen",
-      href: "/",
-      query: { showExport: "true" },
+      href: "/?showExport=true",
     },
   ]
 
@@ -51,18 +48,7 @@ export default function AdminContent() {
               <CardDescription>{link.description}</CardDescription>
             </CardHeader>
             <CardContent>
-              <a
-                href={
-                  link.href +
-                  (link.query
-                    ? "?" +
-                      Object.entries(link.query)
-                        .map(([key, value]) => `${key}=${value}`)
-                        .join("&")
-                    : "")
-                }
-                className="inline-block w-full"
-              >
+              <a href={link.href} className="inline-block w-full">
                 <Button className="w-full">Öffnen</Button>
               </a>
             </CardContent>
