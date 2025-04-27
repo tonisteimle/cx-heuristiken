@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog"
 import type { Guideline, Principle } from "@/types/guideline"
+import { CategoryButtonFilter } from "./category-button-filter"
 import { FIXED_CATEGORIES } from "@/lib/constants"
-import GuidelineListView from "./guideline-list-view"
+import GuidelineListView from "@/components/guideline-list-view" // Absoluter Import für bessere Konsistenz
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { GuidelineDetailDialog } from "./guideline-detail-dialog"
 // Importiere die Typografie-Komponenten
@@ -22,7 +23,6 @@ import {
   DialogTitleText,
   DialogDescriptionText,
 } from "@/components/ui/typography"
-import { CategoryFilterContainer } from "@/components/category-filter-container"
 
 interface GuidelineListProps {
   guidelines: Guideline[]
@@ -38,6 +38,7 @@ interface GuidelineListProps {
   onCategoryChange?: (category: string | null) => void
   viewMode?: "grid" | "list"
   onViewModeChange?: (mode: "grid" | "list") => void
+  hideCategoryFilter?: boolean // Neue Prop
 }
 
 export default function GuidelineList({
@@ -54,6 +55,7 @@ export default function GuidelineList({
   onCategoryChange,
   viewMode: externalViewMode = "grid",
   onViewModeChange,
+  hideCategoryFilter,
 }: GuidelineListProps) {
   // Verwende interne Zustände nur, wenn keine externen bereitgestellt werden
   const [internalSearchTerm, setInternalSearchTerm] = useState("")
@@ -70,7 +72,6 @@ export default function GuidelineList({
 
   const [selectedImageDialog, setSelectedImageDialog] = useState<string | null>(null)
   const [selectedGuideline, setSelectedGuideline] = useState<Guideline | null>(null)
-  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
 
   useEffect(() => {
     console.log(`GuidelineList received ${guidelines.length} guidelines`)
@@ -168,14 +169,13 @@ export default function GuidelineList({
         </div>
 
         {/* Kategoriefilter als Buttons - Nur die festen Kategorien anzeigen */}
-        <CategoryFilterContainer
-          categories={FIXED_CATEGORIES}
-          selectedCategories={selectedCategory ? [selectedCategory] : []}
-          onChange={(cats) => setSelectedCategory(cats.length > 0 ? cats[0] : null)}
-          categoryCount={categoryUsage}
-          onManageCategories={isAuthenticated ? () => setIsCategoryManagerOpen(true) : undefined}
-          isAuthenticated={isAuthenticated}
-        />
+        {!hideCategoryFilter && (
+          <CategoryButtonFilter
+            selectedCategory={selectedCategory}
+            onChange={setSelectedCategory}
+            categoryCount={categoryUsage}
+          />
+        )}
       </div>
     )
   }
@@ -184,7 +184,7 @@ export default function GuidelineList({
     <div className="space-y-6">
       {/* Ansicht basierend auf dem viewMode */}
       {viewMode === "grid" ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-2">
           {filteredGuidelines.map((guideline) => (
             <Card
               key={guideline.id}

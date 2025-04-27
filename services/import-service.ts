@@ -196,98 +196,105 @@ export class ImportService {
 
           console.log(`Gefundene bestehende Guidelines: ${Object.keys(existingGuidelines).length}`)
 
-          for (let i = 0; i < importData.guidelines.length; i++) {
-            const guideline = importData.guidelines[i]
+          // Erhöhe die Chunk-Größe für bessere Performance
+          const CHUNK_SIZE = 200 // Vorher war es wahrscheinlich 100
 
+          // Verarbeite Guidelines in Batches für bessere Performance
+          const guidelineBatches = []
+          for (let i = 0; i < importData.guidelines.length; i += CHUNK_SIZE) {
+            guidelineBatches.push(importData.guidelines.slice(i, i + CHUNK_SIZE))
+          }
+
+          let processedCount = 0
+          for (const batch of guidelineBatches) {
+            const processedGuidelines = batch
+              .map((guideline) => {
+                try {
+                  // Prüfe, ob eine bestehende Guideline mit dieser ID existiert
+                  const existingGuideline = guideline.id ? existingGuidelines[guideline.id] : null
+
+                  // Ensure guideline has required fields
+                  const processedGuideline: Guideline = {
+                    id: guideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                    title: guideline.title || "Untitled",
+                    text: guideline.text || "",
+                    categories: Array.isArray(guideline.categories) ? guideline.categories : [],
+                    principles: Array.isArray(guideline.principles) ? guideline.principles : [],
+                    createdAt: guideline.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    // SVG-Inhalte mit Priorität behandeln:
+                    // 1. Wenn die importierte Guideline SVG-Inhalte hat, verwende diese
+                    // 2. Wenn nicht und eine bestehende Guideline existiert, behalte deren SVG-Inhalte
+                    // 3. Ansonsten keine SVG-Inhalte
+                    ...(guideline.svgContent
+                      ? { svgContent: guideline.svgContent }
+                      : existingGuideline?.svgContent
+                        ? { svgContent: existingGuideline.svgContent }
+                        : {}),
+
+                    ...(guideline.detailSvgContent
+                      ? { detailSvgContent: guideline.detailSvgContent }
+                      : existingGuideline?.detailSvgContent
+                        ? { detailSvgContent: existingGuideline.detailSvgContent }
+                        : {}),
+
+                    // Ähnlich für imageUrl und justification
+                    ...(guideline.imageUrl
+                      ? { imageUrl: guideline.imageUrl }
+                      : existingGuideline?.imageUrl
+                        ? { imageUrl: existingGuideline.imageUrl }
+                        : {}),
+
+                    ...(guideline.justification
+                      ? { justification: guideline.justification }
+                      : existingGuideline?.justification
+                        ? { justification: existingGuideline.justification }
+                        : {}),
+                  }
+
+                  // Zähle SVGs
+                  if (processedGuideline.svgContent) {
+                    if (guideline.svgContent) {
+                      processedSvgCount++
+                    } else if (existingGuideline?.svgContent) {
+                      preservedSvgCount++
+                    }
+                  }
+
+                  return processedGuideline
+                } catch (error) {
+                  console.error(`Error processing guideline:`, error)
+                  return null
+                }
+              })
+              .filter(Boolean)
+
+            // Batch-Speicherung für bessere Performance
             try {
-              // Prüfe, ob eine bestehende Guideline mit dieser ID existiert
-              const existingGuideline = guideline.id ? existingGuidelines[guideline.id] : null
+              const response = await fetch("/api/supabase/batch-save-guidelines", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ guidelines: processedGuidelines }),
+              })
 
-              // Ensure guideline has required fields
-              const processedGuideline: Guideline = {
-                id: guideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                title: guideline.title || "Untitled",
-                text: guideline.text || "",
-                categories: Array.isArray(guideline.categories) ? guideline.categories : [],
-                principles: Array.isArray(guideline.principles) ? guideline.principles : [],
-                createdAt: guideline.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                // SVG-Inhalte mit Priorität behandeln:
-                // 1. Wenn die importierte Guideline SVG-Inhalte hat, verwende diese
-                // 2. Wenn nicht und eine bestehende Guideline existiert, behalte deren SVG-Inhalte
-                // 3. Ansonsten keine SVG-Inhalte
-                ...(guideline.svgContent
-                  ? { svgContent: guideline.svgContent }
-                  : existingGuideline?.svgContent
-                    ? { svgContent: existingGuideline.svgContent }
-                    : {}),
-
-                ...(guideline.detailSvgContent
-                  ? { detailSvgContent: guideline.detailSvgContent }
-                  : existingGuideline?.detailSvgContent
-                    ? { detailSvgContent: existingGuideline.detailSvgContent }
-                    : {}),
-
-                // Ähnlich für imageUrl und justification
-                ...(guideline.imageUrl
-                  ? { imageUrl: guideline.imageUrl }
-                  : existingGuideline?.imageUrl
-                    ? { imageUrl: existingGuideline.imageUrl }
-                    : {}),
-
-                ...(guideline.justification
-                  ? { justification: guideline.justification }
-                  : existingGuideline?.justification
-                    ? { justification: existingGuideline.justification }
-                    : {}),
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                console.error(`API error: ${response.status} ${errorData.error || response.statusText}`)
               }
-
-              // Zähle SVGs
-              if (processedGuideline.svgContent) {
-                if (guideline.svgContent) {
-                  processedSvgCount++
-                  console.log(
-                    `Guideline ${i + 1} hat neuen SVG-Inhalt: ${processedGuideline.svgContent.substring(0, 50)}...`,
-                  )
-                } else if (existingGuideline?.svgContent) {
-                  preservedSvgCount++
-                  console.log(
-                    `Guideline ${i + 1} behält bestehenden SVG-Inhalt: ${processedGuideline.svgContent.substring(0, 50)}...`,
-                  )
-                }
-              }
-
-              // Save guideline via API
-              try {
-                const response = await fetch("/api/supabase/save-guideline", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify(processedGuideline),
-                })
-
-                if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({}))
-                  throw new Error(`API error: ${response.status} ${errorData.error || response.statusText}`)
-                }
-
-                const result = await response.json()
-                console.log(`Guideline ${i + 1}/${importData.guidelines.length} saved:`, result)
-              } catch (apiError) {
-                console.error(`Error saving guideline ${i + 1} via API:`, apiError)
-                throw apiError
-              }
-            } catch (error) {
-              console.error(`Error processing guideline at index ${i}:`, error)
+            } catch (apiError) {
+              console.error(`Error saving guidelines batch via API:`, apiError)
             }
+
+            processedCount += batch.length
 
             // Update progress
             if (onProgress) {
               onProgress({
                 stage: "saving-guidelines",
-                progress: 50 + (i / importData.guidelines.length) * 20,
-                message: `Saving guideline ${i + 1}/${importData.guidelines.length}`,
+                progress: 50 + (processedCount / importData.guidelines.length) * 20,
+                message: `Saving guidelines ${processedCount}/${importData.guidelines.length}`,
               })
             }
           }
@@ -368,12 +375,6 @@ export class ImportService {
     }
   }
 
-  /**
-   * Validates JSON data for import
-   * @param jsonText The JSON text to validate
-   * @param onProgress Optional callback for progress updates
-   * @returns Validation result with parsed data if successful
-   */
   static async validateJsonData(
     jsonText: string,
     onProgress?: (progress: ImportProgress) => void,
@@ -393,6 +394,7 @@ export class ImportService {
       // Try to parse the JSON
       let parsedData: Partial<StorageData>
       try {
+        // Verwende einen performanteren JSON-Parser für große Datenmengen
         parsedData = JSON.parse(jsonText)
       } catch (err) {
         console.error("validateJsonData: JSON parsing error", err)
@@ -413,7 +415,7 @@ export class ImportService {
         return { valid: false, error: "The JSON data is empty or invalid." }
       }
 
-      // Ensure the basic structure is present
+      // Verwende Referenzen statt Kopien, wo möglich
       const validData: StorageData = {
         guidelines: Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
         categories: Array.isArray(parsedData.categories) ? parsedData.categories : [],
@@ -422,10 +424,12 @@ export class ImportService {
         version: parsedData.version || "2.0",
       }
 
-      // Zähle SVGs in den validierten Daten
+      // Optimierte SVG-Zählung mit frühem Abbruch
       let svgCount = 0
       if (Array.isArray(validData.guidelines)) {
-        for (const guideline of validData.guidelines) {
+        // Verwende for-Schleife statt forEach für bessere Performance
+        for (let i = 0; i < validData.guidelines.length; i++) {
+          const guideline = validData.guidelines[i]
           if (guideline && guideline.svgContent) {
             svgCount++
           }

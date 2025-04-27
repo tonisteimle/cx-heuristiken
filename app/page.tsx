@@ -18,6 +18,7 @@ import type { Guideline, Principle, PrincipleElement } from "@/types/guideline"
 import { getStorageService } from "@/services/storage-factory"
 import { UnifiedImportDialogTrigger } from "@/components/unified-import-dialog-trigger"
 import { ExportOptionsDialog, type ExportOptions } from "@/components/export-options-dialog"
+import { CategorySidebar } from "@/components/category-sidebar"
 
 function GuidelinesManager() {
   const { toast } = useToast()
@@ -165,6 +166,17 @@ function GuidelinesManager() {
     return state.guidelines.filter((g) => g.imageUrl || g.detailImageUrl || g.svgContent || g.detailSvgContent).length
   }
 
+  // Berechne die Anzahl der Guidelines pro Kategorie
+  const categoryCount = state.guidelines.reduce(
+    (counts, guideline) => {
+      guideline.categories.forEach((cat) => {
+        counts[cat] = (counts[cat] || 0) + 1
+      })
+      return counts
+    },
+    {} as Record<string, number>,
+  )
+
   return (
     <main className="container mx-auto px-4">
       {state.hasError && (
@@ -300,6 +312,7 @@ function GuidelinesManager() {
                 onCategoryChange={setSelectedCategory}
                 viewMode={guidelinesViewMode}
                 onViewModeChange={setGuidelinesViewMode}
+                hideCategoryFilter={true}
               />
             )}
 
@@ -322,59 +335,73 @@ function GuidelinesManager() {
             )}
           </div>
 
-          {/* Hauptinhalt mit Abstand zum Header */}
-          <div className="mt-[200px]">
-            {activeTab === "guidelines" ? (
-              <div>
-                {state.isLoading ? (
-                  <div className="text-center py-12">
-                    <RefreshCw size={24} className="mx-auto animate-spin mb-4" />
-                    <p className="text-muted-foreground">Loading guidelines from database...</p>
-                  </div>
-                ) : (
-                  <GuidelineList
-                    guidelines={state.guidelines}
-                    principles={state.principles}
-                    onEdit={handleEdit}
-                    onDelete={handleDeleteGuideline}
-                    isAuthenticated={isAuthenticated}
-                    headerHeight={200}
-                    inFixedHeader={false}
-                    searchTerm={searchTermGuidelines}
-                    onSearchChange={setSearchTermGuidelines}
-                    selectedCategory={selectedCategory}
-                    onCategoryChange={setSelectedCategory}
-                    viewMode={guidelinesViewMode}
-                    onViewModeChange={setGuidelinesViewMode}
-                  />
-                )}
-              </div>
-            ) : (
-              <div>
-                {state.isLoading ? (
-                  <div className="text-center py-12">
-                    <RefreshCw size={24} className="mx-auto animate-spin mb-4" />
-                    <p className="text-muted-foreground">Loading principles from database...</p>
-                  </div>
-                ) : (
-                  <PrincipleManager
-                    principles={state.principles}
-                    onSave={savePrinciples}
-                    isAuthenticated={isAuthenticated}
-                    isAddDialogOpen={isAddPrincipleDialogOpen}
-                    onAddDialogOpenChange={setIsAddPrincipleDialogOpen}
-                    headerHeight={200}
-                    inFixedHeader={false}
-                    searchTerm={searchTermPrinciples}
-                    onSearchChange={setSearchTermPrinciples}
-                    selectedElement={selectedElement}
-                    onElementChange={setSelectedElement}
-                    viewMode={principlesViewMode}
-                    onViewModeChange={setPrinciplesViewMode}
-                  />
-                )}
-              </div>
+          {/* Hauptinhalt mit Sidebar und Content */}
+          <div className="mt-[164px] flex">
+            {/* Sidebar für Kategorien */}
+            {activeTab === "guidelines" && !state.isLoading && (
+              <CategorySidebar
+                selectedCategory={selectedCategory}
+                onChange={setSelectedCategory}
+                categoryCount={categoryCount}
+                className="fixed left-0 top-[164px] bottom-0 z-40"
+              />
             )}
+
+            {/* Hauptinhalt mit Abstand zur Sidebar */}
+            <div className={`flex-1 ${activeTab === "guidelines" && !state.isLoading ? "ml-64" : ""}`}>
+              {activeTab === "guidelines" ? (
+                <div>
+                  {state.isLoading ? (
+                    <div className="text-center py-12">
+                      <RefreshCw size={24} className="mx-auto animate-spin mb-4" />
+                      <p className="text-muted-foreground">Loading guidelines from database...</p>
+                    </div>
+                  ) : (
+                    <GuidelineList
+                      guidelines={state.guidelines}
+                      principles={state.principles}
+                      onEdit={handleEdit}
+                      onDelete={handleDeleteGuideline}
+                      isAuthenticated={isAuthenticated}
+                      headerHeight={200}
+                      inFixedHeader={false}
+                      searchTerm={searchTermGuidelines}
+                      onSearchChange={setSearchTermGuidelines}
+                      selectedCategory={selectedCategory}
+                      onCategoryChange={setSelectedCategory}
+                      viewMode={guidelinesViewMode}
+                      onViewModeChange={setGuidelinesViewMode}
+                      hideCategoryFilter={true} // Neue Prop, um die Kategorie-Filter in der GuidelineList zu verstecken
+                    />
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {state.isLoading ? (
+                    <div className="text-center py-12">
+                      <RefreshCw size={24} className="mx-auto animate-spin mb-4" />
+                      <p className="text-muted-foreground">Loading principles from database...</p>
+                    </div>
+                  ) : (
+                    <PrincipleManager
+                      principles={state.principles}
+                      onSave={savePrinciples}
+                      isAuthenticated={isAuthenticated}
+                      isAddDialogOpen={isAddPrincipleDialogOpen}
+                      onAddDialogOpenChange={setIsAddPrincipleDialogOpen}
+                      headerHeight={200}
+                      inFixedHeader={false}
+                      searchTerm={searchTermPrinciples}
+                      onSearchChange={setSearchTermPrinciples}
+                      selectedElement={selectedElement}
+                      onElementChange={setSelectedElement}
+                      viewMode={principlesViewMode}
+                      onViewModeChange={setPrinciplesViewMode}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
