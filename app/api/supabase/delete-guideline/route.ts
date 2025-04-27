@@ -1,33 +1,46 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createApiHandler } from "@/lib/api-handler"
 
-// Create a Supabase client for server-side operations
-const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "")
+// Definiere den Handler für das Löschen einer Guideline
+async function deleteGuidelineHandler(data: { id: string }, supabase: any) {
+  const { id } = data
 
-export async function POST(request: Request) {
-  try {
-    const { id } = await request.json()
-
-    if (!id) {
-      return NextResponse.json({ success: false, error: "No guideline ID provided" }, { status: 400 })
-    }
-
-    // Delete guideline
-    const { error } = await supabase.from("guidelines").delete().eq("id", id)
-
-    if (error) {
-      throw new Error(`Failed to delete guideline: ${error.message}`)
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Error deleting guideline:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error deleting guideline",
-      },
-      { status: 500 },
-    )
+  if (!id) {
+    throw new Error("Keine Guideline-ID angegeben")
   }
+
+  // Lade die aktuellen Daten
+  const { data: currentData } = await supabase.from("guidelines_data").select("data").eq("id", "main").single()
+
+  if (!currentData?.data?.guidelines) {
+    throw new Error("Keine Guidelines gefunden")
+  }
+
+  // Filtere die zu löschende Guideline heraus
+  const updatedGuidelines = currentData.data.guidelines.filter((g: any) => g.id !== id)
+
+  // Wenn die Anzahl gleich ist, wurde nichts gelöscht
+  if (updatedGuidelines.length === currentData.data.guidelines.length) {
+    throw new Error(`Guideline mit ID ${id} nicht gefunden`)
+  }
+
+  // Aktualisiere die Daten in Supabase
+  const { error } = await supabase
+    .from("guidelines_data")
+    .update({
+      data: {
+        ...currentData.data,
+        guidelines: updatedGuidelines,
+        lastUpdated: new Date().toISOString(),
+      },
+    })
+    .eq("id", "main")
+
+  if (error) {
+    throw error
+  }
+
+  return { message: `Guideline mit ID ${id} erfolgreich gelöscht` }
 }
+
+// Exportiere die POST-Funktion mit dem API-Handler
+export const POST = createApiHandler(deleteGuidelineHandler)

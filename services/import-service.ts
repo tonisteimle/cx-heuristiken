@@ -1,7 +1,6 @@
 import type { StorageData } from "@/types/storage-data"
 import { getStorageService } from "./storage-factory"
-import type { Guideline, Principle } from "@/types/guideline"
-import { JsonValidator } from "./json-validator"
+import type { Guideline } from "@/types/guideline"
 
 export interface ImportOptions {
   guidelines: boolean
@@ -13,6 +12,7 @@ export interface ImportOptions {
 export interface ImportResult {
   success: boolean
   error?: string
+  message?: string
   stats?: {
     guidelines: number
     principles: number
@@ -30,6 +30,264 @@ export interface ImportProgress {
  * Service for handling all import operations
  */
 export class ImportService {
+  /**
+   * Processes and saves data from a JSON string
+   * @param jsonString The JSON string to process
+   * @param options Import options
+   * @param onProgress Callback for progress updates
+   * @returns Import result
+   */
+  static async processAndSaveData(
+    jsonString: string,
+    options: ImportOptions,
+    onProgress?: (progress: ImportProgress) => void,
+  ): Promise<ImportResult> {
+    try {
+      console.log("processAndSaveData: Starting import", { options })
+
+      // Report initial progress
+      if (onProgress) {
+        onProgress({ stage: "preparing", progress: 5, message: "Preparing import..." })
+      }
+
+      // Parse the JSON string
+      let parsedData: any
+      try {
+        if (onProgress) {
+          onProgress({ stage: "parsing", progress: 10, message: "Parsing JSON data..." })
+        }
+        parsedData = JSON.parse(jsonString)
+        console.log("JSON parsed successfully")
+      } catch (parseError) {
+        console.error("Error parsing JSON data:", parseError)
+        return {
+          success: false,
+          error: `Error parsing JSON data: ${parseError instanceof Error ? parseError.message : "Unknown error"}`,
+        }
+      }
+
+      // Basic validation of the parsed data
+      if (!parsedData || typeof parsedData !== "object") {
+        console.error("Invalid JSON data: not an object")
+        return { success: false, error: "The JSON data is empty or invalid." }
+      }
+
+      // Get the storage service
+      const storageService = getStorageService()
+
+      // Load current data if not in replace mode
+      let currentData: StorageData | null = null
+      if (!options.replaceMode) {
+        try {
+          if (onProgress) {
+            onProgress({ stage: "loading-current", progress: 20, message: "Loading current data..." })
+          }
+          currentData = await storageService.loadData()
+          console.log("Current data loaded successfully")
+        } catch (loadError) {
+          console.error("Error loading current data:", loadError)
+          return {
+            success: false,
+            error: `Error loading current data: ${loadError instanceof Error ? loadError.message : "Unknown error"}`,
+          }
+        }
+      }
+
+      // Prepare data for import
+      const importData: StorageData = {
+        guidelines: options.guidelines && Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
+        categories: options.categories && Array.isArray(parsedData.categories) ? parsedData.categories : [],
+        principles: options.principles && Array.isArray(parsedData.principles) ? parsedData.principles : [],
+        lastUpdated: new Date().toISOString(),
+        version: parsedData.version || "2.0",
+      }
+
+      console.log("Import data prepared", {
+        guidelinesCount: importData.guidelines.length,
+        categoriesCount: importData.categories.length,
+        principlesCount: importData.principles.length,
+      })
+
+      // Process and save data
+      if (options.replaceMode) {
+        // Replace mode: save the imported data directly
+        if (onProgress) {
+          onProgress({ stage: "saving", progress: 50, message: "Saving imported data..." })
+        }
+
+        try {
+          // Direkt an die API senden, um Umgebungsvariablen-Probleme zu umgehen
+          const response = await fetch("/api/supabase/save-data", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              data: importData,
+              isIncremental: false,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(`API error: ${response.status} ${errorData.error || response.statusText}`)
+          }
+
+          const result = await response.json()
+          console.log("API response:", result)
+        } catch (saveError) {
+          console.error("Error saving imported data:", saveError)
+          return {
+            success: false,
+            error: `Error saving imported data: ${saveError instanceof Error ? saveError.message : "Unknown error"}`,
+          }
+        }
+      } else {
+        // Merge mode: merge with existing data
+        if (onProgress) {
+          onProgress({ stage: "merging", progress: 40, message: "Merging with existing data..." })
+        }
+
+        if (!currentData) {
+          console.error("Current data is null in merge mode")
+          return {
+            success: false,
+            error: "Failed to load current data for merging",
+          }
+        }
+
+        // Process guidelines
+        if (options.guidelines && importData.guidelines.length > 0) {
+          if (onProgress) {
+            onProgress({ stage: "processing-guidelines", progress: 50, message: "Processing guidelines..." })
+          }
+
+          for (let i = 0; i < importData.guidelines.length; i++) {
+            const guideline = importData.guidelines[i]
+
+            try {
+              // Ensure guideline has required fields
+              const processedGuideline: Guideline = {
+                id: guideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                title: guideline.title || "Untitled",
+                text: guideline.text || "",
+                categories: Array.isArray(guideline.categories) ? guideline.categories : [],
+                principles: Array.isArray(guideline.principles) ? guideline.principles : [],
+                createdAt: guideline.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                // Preserve SVG content if present
+                ...(guideline.svgContent ? { svgContent: guideline.svgContent } : {}),
+                ...(guideline.imageUrl ? { imageUrl: guideline.imageUrl } : {}),
+                ...(guideline.justification ? { justification: guideline.justification } : {}),
+              }
+
+              // Save guideline via API
+              try {
+                const response = await fetch("/api/supabase/save-guideline", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify(processedGuideline),
+                })
+
+                if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({}))
+                  throw new Error(`API error: ${response.status} ${errorData.error || response.statusText}`)
+                }
+
+                const result = await response.json()
+                console.log(`Guideline ${i + 1}/${importData.guidelines.length} saved:`, result)
+              } catch (apiError) {
+                console.error(`Error saving guideline ${i + 1} via API:`, apiError)
+                throw apiError
+              }
+            } catch (error) {
+              console.error(`Error processing guideline at index ${i}:`, error)
+            }
+
+            // Update progress
+            if (onProgress) {
+              onProgress({
+                stage: "saving-guidelines",
+                progress: 50 + (i / importData.guidelines.length) * 20,
+                message: `Saving guideline ${i + 1}/${importData.guidelines.length}`,
+              })
+            }
+          }
+        }
+
+        // Process principles and categories via API
+        if (
+          (options.principles && importData.principles.length > 0) ||
+          (options.categories && importData.categories.length > 0)
+        ) {
+          if (onProgress) {
+            onProgress({
+              stage: "processing-principles-categories",
+              progress: 80,
+              message: "Processing principles and categories...",
+            })
+          }
+
+          // Prepare data for API
+          const apiData: Partial<StorageData> = {
+            principles: options.principles ? importData.principles : [],
+            categories: options.categories ? importData.categories : [],
+            guidelines: [], // No guidelines here, we processed them individually
+            lastUpdated: new Date().toISOString(),
+            version: "2.0",
+          }
+
+          try {
+            const response = await fetch("/api/supabase/save-data", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                data: apiData,
+                isIncremental: true, // Use incremental mode to merge with existing data
+              }),
+            })
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              throw new Error(`API error: ${response.status} ${errorData.error || response.statusText}`)
+            }
+
+            const result = await response.json()
+            console.log("Principles and categories saved:", result)
+          } catch (apiError) {
+            console.error("Error saving principles and categories:", apiError)
+          }
+        }
+      }
+
+      // Report completion
+      if (onProgress) {
+        onProgress({ stage: "completed", progress: 100, message: "Import completed" })
+      }
+
+      console.log("Import completed successfully")
+      return {
+        success: true,
+        message: "Import completed successfully",
+        stats: {
+          guidelines: importData.guidelines.length,
+          principles: importData.principles.length,
+          categories: importData.categories.length,
+        },
+      }
+    } catch (error) {
+      console.error("Error in processAndSaveData:", error)
+      return {
+        success: false,
+        error: `Import failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      }
+    }
+  }
+
   /**
    * Validates JSON data for import
    * @param jsonText The JSON text to validate
@@ -49,57 +307,33 @@ export class ImportService {
 
       // Report progress
       if (onProgress) {
-        onProgress({ stage: "parsing", progress: 10 })
-      }
-
-      // Verbesserte JSON-Validierung und -Korrektur
-      const validationResult = JsonValidator.validateAndFix(jsonText)
-
-      // Report progress
-      if (onProgress) {
-        onProgress({ stage: "validating structure", progress: 20 })
-      }
-
-      if (!validationResult.valid) {
-        console.error("validateJsonData: JSON structure validation failed", validationResult)
-        return {
-          valid: false,
-          error: `JSON-Struktur konnte nicht korrigiert werden: ${validationResult.originalError}`,
-        }
-      }
-
-      // Verwende den korrigierten JSON-Text
-      const fixedJsonText = validationResult.fixed
-
-      // Wenn Korrekturen vorgenommen wurden, logge sie
-      if (validationResult.corrections.length > 0) {
-        console.log("validateJsonData: JSON corrections applied:", validationResult.corrections)
+        onProgress({ stage: "parsing", progress: 30 })
       }
 
       // Try to parse the JSON
       let parsedData: Partial<StorageData>
       try {
-        parsedData = JSON.parse(fixedJsonText)
+        parsedData = JSON.parse(jsonText)
       } catch (err) {
-        console.error("validateJsonData: JSON parsing error after fixes", err)
+        console.error("validateJsonData: JSON parsing error", err)
         return {
           valid: false,
-          error: `Invalid JSON format after fixes: ${err instanceof Error ? err.message : "Unknown error"}`,
+          error: `Invalid JSON format: ${err instanceof Error ? err.message : "Unknown error"}`,
         }
       }
 
       // Report progress
       if (onProgress) {
-        onProgress({ stage: "validating content", progress: 30 })
+        onProgress({ stage: "validating content", progress: 60 })
       }
 
-      // Validate structure - less strict validation
+      // Basic structure validation
       if (!parsedData || typeof parsedData !== "object") {
         console.warn("validateJsonData: Parsed data is not an object")
         return { valid: false, error: "The JSON data is empty or invalid." }
       }
 
-      // Ensure the basic structure is present, but allow missing attributes
+      // Ensure the basic structure is present
       const validData: StorageData = {
         guidelines: Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
         categories: Array.isArray(parsedData.categories) ? parsedData.categories : [],
@@ -117,16 +351,17 @@ export class ImportService {
         }
       }
 
-      // Sanitize text fields in guidelines and principles
-      validData.guidelines = this.sanitizeGuidelines(validData.guidelines)
-      validData.principles = this.sanitizePrinciples(validData.principles)
-
       // Report progress
       if (onProgress) {
         onProgress({ stage: "validated", progress: 100 })
       }
 
-      console.log("validateJsonData: Validation successful")
+      console.log("validateJsonData: Validation successful", {
+        guidelinesCount: validData.guidelines.length,
+        categoriesCount: validData.categories.length,
+        principlesCount: validData.principles.length,
+      })
+
       return { valid: true, data: validData }
     } catch (error) {
       console.error("Error validating JSON data:", error)
@@ -134,565 +369,6 @@ export class ImportService {
         valid: false,
         error: `Error validating JSON data: ${error instanceof Error ? error.message : "Unknown error"}`,
       }
-    }
-  }
-
-  /**
-   * Cleans JSON text to fix common issues
-   * @param jsonText Original JSON text
-   * @returns Cleaned JSON text
-   */
-  private static cleanJsonText(jsonText: string): string {
-    const cleanedText = jsonText
-      // Normalize whitespace
-      .replace(/\n/g, " ")
-      .replace(/\r/g, "")
-      .replace(/\t/g, " ")
-      // Remove trailing commas
-      .replace(/,\s*}/g, "}")
-      .replace(/,\s*]/g, "]")
-      // Fix multiple consecutive spaces
-      .replace(/\s+/g, " ")
-      // Remove invalid characters
-      .replace(/[^\x20-\x7E]/g, "")
-      // Handle invalid quotation marks
-      .replace(/[""'']/g, '"')
-      // Fix missing commas in object literals (risky but helpful in some cases)
-      .replace(/}(\s*){/g, "},{")
-      // Fix missing commas in arrays (risky but helpful in some cases)
-      .replace(/](\s*)\[/g, "],[")
-
-    return cleanedText
-  }
-
-  /**
-   * Sanitize guidelines text fields
-   * @param guidelines Guidelines to sanitize
-   * @returns Sanitized guidelines
-   */
-  private static sanitizeGuidelines(guidelines: any[]): Guideline[] {
-    return guidelines.map((guideline) => ({
-      ...guideline,
-      text: typeof guideline.text === "string" ? this.sanitizeDescription(guideline.text) : guideline.text,
-      justification:
-        typeof guideline.justification === "string"
-          ? this.sanitizeDescription(guideline.justification)
-          : guideline.justification,
-    })) as Guideline[]
-  }
-
-  /**
-   * Sanitize principles text fields
-   * @param principles Principles to sanitize
-   * @returns Sanitized principles
-   */
-  private static sanitizePrinciples(principles: any[]): Principle[] {
-    return principles.map((principle) => ({
-      ...principle,
-      description:
-        typeof principle.description === "string"
-          ? this.sanitizeDescription(principle.description)
-          : principle.description,
-      evidenz: typeof principle.evidenz === "string" ? this.sanitizeDescription(principle.evidenz) : principle.evidenz,
-      implikation:
-        typeof principle.implikation === "string"
-          ? this.sanitizeDescription(principle.implikation)
-          : principle.implikation,
-    })) as Principle[]
-  }
-
-  /**
-   * Removes surrounding quotes from a string
-   * @param text The text to sanitize
-   * @returns The sanitized text
-   */
-  static sanitizeDescription(text: string): string {
-    // Handle various types of quotation marks
-    if (text && typeof text === "string") {
-      const quotesRegex = /^["'“”‘’](.*)["'“”‘’]$/
-      const match = text.match(quotesRegex)
-      return match ? match[1] : text
-    }
-    return text
-  }
-
-  /**
-   * Imports data with the specified options
-   * @param data The data to import
-   * @param options Import options
-   * @param onProgress Callback for progress updates
-   * @returns Import result
-   */
-  static async importData(
-    data: StorageData,
-    options: ImportOptions,
-    onProgress?: (progress: ImportProgress) => void,
-  ): Promise<ImportResult> {
-    try {
-      console.log("importData: Starting import", { options })
-
-      // Report initial progress
-      if (onProgress) {
-        onProgress({ stage: "preparing", progress: 10 })
-      }
-
-      // Filter data based on import options
-      const filteredData: StorageData = {
-        guidelines: options.guidelines ? data.guidelines : [],
-        categories: options.categories ? data.categories : [],
-        principles: options.principles ? data.principles : [],
-        lastUpdated: new Date().toISOString(),
-        version: "2.0",
-      }
-
-      // Report progress
-      if (onProgress) {
-        onProgress({ stage: "filtering", progress: 20 })
-      }
-
-      // Log the operation to console
-      console.log(`${options.replaceMode ? "Replacing all data" : "Importing data"}`, {
-        guidelinesCount: filteredData.guidelines.length,
-        categoriesCount: filteredData.categories.length,
-        principlesCount: filteredData.principles.length,
-        replaceMode: options.replaceMode,
-        dataSize: JSON.stringify(filteredData).length,
-      })
-
-      // Check if the data is too large (over 5MB)
-      const dataSize = JSON.stringify(filteredData).length
-      const isLargeData = dataSize > 5 * 1024 * 1024 // 5MB
-
-      if (isLargeData) {
-        console.log("Large data detected, using incremental import")
-      }
-
-      // Get the storage service
-      const storageService = getStorageService()
-
-      let finalData: StorageData
-
-      // Prepare the final data based on the import mode
-      if (options.replaceMode) {
-        // Replace all existing data
-        finalData = {
-          ...filteredData,
-          lastUpdated: new Date().toISOString(),
-        }
-
-        // Report progress
-        if (onProgress) {
-          onProgress({ stage: "preparing-replace", progress: 40 })
-        }
-      } else {
-        // Add data to existing by merging
-        let currentData: StorageData
-        try {
-          // Report progress
-          if (onProgress) {
-            onProgress({ stage: "loading-current", progress: 30 })
-          }
-
-          console.log("Loading current data...")
-          currentData = await storageService.loadData()
-          console.log("Current data loaded successfully")
-        } catch (loadError) {
-          console.error("Error loading current data during import:", loadError)
-          return {
-            success: false,
-            error: `Error loading current data: ${loadError instanceof Error ? loadError.message : "Unknown error"}`,
-          }
-        }
-
-        // Report progress
-        if (onProgress) {
-          onProgress({ stage: "merging", progress: 40 })
-        }
-
-        // Intelligent merge of data
-        console.log("Merging data...")
-        finalData = ImportService.mergeData(currentData, filteredData)
-        console.log("Data merged successfully")
-      }
-
-      try {
-        return await ImportService.saveImportData(finalData, options, storageService, isLargeData, onProgress)
-      } catch (saveError) {
-        console.error("Error saving data during import:", saveError)
-        return {
-          success: false,
-          error: `Error saving data: ${saveError instanceof Error ? saveError.message : "Unknown error"}`,
-        }
-      }
-    } catch (error) {
-      console.error(`Error ${options.replaceMode ? "replacing" : "importing"} data:`, error)
-      return {
-        success: false,
-        error: `Import failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      }
-    }
-  }
-
-  /**
-   * Saves imported data with progress reporting
-   * @param finalData Data to save
-   * @param options Import options
-   * @param storageService Storage service instance
-   * @param isLargeData Whether data is large
-   * @param onProgress Progress callback
-   * @returns Import result
-   */
-  private static async saveImportData(
-    finalData: StorageData,
-    options: ImportOptions,
-    storageService: any,
-    isLargeData: boolean,
-    onProgress?: (progress: ImportProgress) => void,
-  ): Promise<ImportResult> {
-    // Report progress
-    if (onProgress) {
-      onProgress({ stage: "saving", progress: 60 })
-    }
-
-    console.log("Saving data...")
-
-    let success = false
-
-    if (isLargeData) {
-      // For large data, use incremental saving
-      success = await ImportService.saveDataIncrementally(finalData, storageService, onProgress)
-    } else {
-      // For smaller data, save everything at once
-      success = await storageService.saveData(finalData)
-    }
-
-    // Report progress
-    if (onProgress) {
-      onProgress({ stage: "completed", progress: 100 })
-    }
-
-    console.log("Data saved successfully:", success)
-
-    if (success) {
-      return {
-        success: true,
-        stats: {
-          guidelines: finalData.guidelines.length,
-          principles: finalData.principles.length,
-          categories: finalData.categories.length,
-        },
-      }
-    } else {
-      throw new Error(`Error ${options.replaceMode ? "replacing" : "saving"} imported data`)
-    }
-  }
-
-  /**
-   * Saves large data incrementally in chunks
-   * @param finalData Data to save
-   * @param storageService Storage service instance
-   * @param onProgress Progress callback
-   * @returns Success status
-   */
-  private static async saveDataIncrementally(
-    finalData: StorageData,
-    storageService: any,
-    onProgress?: (progress: ImportProgress) => void,
-  ): Promise<boolean> {
-    console.log("Using incremental saving for large data")
-
-    // Save guidelines in chunks
-    if (finalData.guidelines.length > 0) {
-      const chunkSize = 50
-      for (let i = 0; i < finalData.guidelines.length; i += chunkSize) {
-        const chunk = finalData.guidelines.slice(i, i + chunkSize)
-        const chunkNumber = i / chunkSize + 1
-        const totalChunks = Math.ceil(finalData.guidelines.length / chunkSize)
-        console.log(`Saving guidelines chunk ${chunkNumber}/${totalChunks}`)
-
-        // Report progress
-        if (onProgress) {
-          onProgress({
-            stage: "saving-guidelines",
-            progress: 60 + (i / finalData.guidelines.length) * 20,
-            message: `Saving guidelines chunk ${chunkNumber}/${totalChunks}`,
-          })
-        }
-
-        // Create a temporary data object with just this chunk
-        const chunkData = {
-          ...finalData,
-          guidelines: chunk,
-          lastUpdated: new Date().toISOString(),
-        }
-
-        try {
-          const chunkSuccess = await storageService.saveData(chunkData, true)
-          if (!chunkSuccess) {
-            throw new Error(`Failed to save guidelines chunk ${chunkNumber}: chunkSuccess=${chunkSuccess}`)
-          }
-        } catch (chunkSaveError) {
-          console.error(`Error saving guidelines chunk ${chunkNumber}:`, chunkSaveError)
-          throw new Error(
-            `Failed to save guidelines chunk ${chunkNumber}: ${
-              chunkSaveError instanceof Error ? chunkSaveError.message : "Unknown error"
-            }`,
-          )
-        }
-      }
-    }
-
-    // Report progress
-    if (onProgress) {
-      onProgress({ stage: "saving-final", progress: 80 })
-    }
-
-    // Save the rest of the data (categories and principles)
-    const finalChunkData = {
-      ...finalData,
-      guidelines: [], // Clear guidelines to avoid exceeding size limits
-    }
-
-    return await storageService.saveData(finalChunkData)
-  }
-
-  /**
-   * Generic merge function for entities with IDs
-   * @param existing Existing entities
-   * @param imported Entities to import
-   * @param defaultId ID generation function
-   * @param defaultValues Default values for missing attributes
-   * @param mergeStrategy Custom merge strategy function
-   * @returns Merged entities
-   */
-  private static mergeEntities<T extends { id: string }>(
-    existing: T[],
-    imported: T[],
-    defaultId: () => string,
-    defaultValues: Partial<T>,
-    mergeStrategy?: (existingEntity: T, importedEntity: T) => T,
-  ): T[] {
-    const result = [...existing]
-
-    imported.forEach((importedEntity) => {
-      // Check if entity already exists
-      const existingIndex = result.findIndex((e) => e.id === importedEntity.id)
-
-      if (existingIndex >= 0) {
-        // Use custom merge strategy if provided
-        if (mergeStrategy) {
-          result[existingIndex] = mergeStrategy(result[existingIndex], importedEntity)
-        } else {
-          // Default merge strategy: spread both objects with imported taking precedence
-          result[existingIndex] = {
-            ...result[existingIndex],
-            ...importedEntity,
-          }
-        }
-      } else {
-        // Add new entity with defaults
-        result.push({
-          id: importedEntity.id || defaultId(),
-          ...defaultValues,
-          ...importedEntity,
-        } as T)
-      }
-    })
-
-    return result
-  }
-
-  /**
-   * Merges two sets of principles
-   * @param existing Existing principles
-   * @param imported Principles to import
-   * @returns Merged principles
-   */
-  static mergePrinciples(existing: Principle[], imported: Principle[]): Principle[] {
-    const defaultId = () => `principle-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-
-    const defaultValues: Partial<Principle> = {
-      name: "Unnamed Principle",
-      description: "",
-      evidenz: "",
-      elements: [],
-    }
-
-    const mergeStrategy = (existingPrinciple: Principle, importedPrinciple: Principle): Principle => {
-      return {
-        ...existingPrinciple,
-        ...importedPrinciple,
-        // Ensure no attributes are lost
-        name: importedPrinciple.name || existingPrinciple.name,
-        description: importedPrinciple.description || existingPrinciple.description,
-        evidenz: importedPrinciple.evidenz || existingPrinciple.evidenz,
-        elements: importedPrinciple.elements || existingPrinciple.elements || [],
-      }
-    }
-
-    return this.mergeEntities<Principle>(existing, imported, defaultId, defaultValues, mergeStrategy)
-  }
-
-  /**
-   * Merges two sets of guidelines
-   * @param existing Existing guidelines
-   * @param imported Guidelines to import
-   * @returns Merged guidelines
-   */
-  static mergeGuidelines(existing: Guideline[], imported: Guideline[]): Guideline[] {
-    const defaultId = () => `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-
-    const defaultValues: Partial<Guideline> = {
-      title: "Unnamed Guideline",
-      text: "",
-      justification: "",
-      categories: [],
-      principles: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-
-    const mergeStrategy = (existingGuideline: Guideline, importedGuideline: Guideline): Guideline => {
-      return {
-        ...existingGuideline,
-        ...importedGuideline,
-        // Ensure no attributes are lost
-        title: importedGuideline.title || existingGuideline.title,
-        text: importedGuideline.text || existingGuideline.text,
-        justification: importedGuideline.justification || existingGuideline.justification,
-        categories: importedGuideline.categories || existingGuideline.categories || [],
-        principles: importedGuideline.principles || existingGuideline.principles || [],
-        updatedAt: new Date().toISOString(),
-      }
-    }
-
-    return this.mergeEntities<Guideline>(existing, imported, defaultId, defaultValues, mergeStrategy)
-  }
-
-  /**
-   * Imports principles from a special format
-   * @param principles Principles to import
-   * @returns Import result
-   */
-  static async importPrinciples(principles: Principle[]): Promise<ImportResult> {
-    try {
-      // Get the storage service
-      const storageService = getStorageService()
-
-      // Load current data
-      const currentData = await storageService.loadData()
-
-      // Merge principles
-      const mergedPrinciples = ImportService.mergePrinciples(currentData.principles, principles)
-
-      // Save the updated data
-      const success = await storageService.saveData({
-        ...currentData,
-        principles: mergedPrinciples,
-        lastUpdated: new Date().toISOString(),
-      })
-
-      if (success) {
-        return {
-          success: true,
-          stats: {
-            principles: principles.length,
-            guidelines: 0,
-            categories: 0,
-          },
-        }
-      } else {
-        throw new Error("Failed to save principles")
-      }
-    } catch (error) {
-      console.error("Error importing principles:", error)
-      return {
-        success: false,
-        error: `Error importing principles: ${error instanceof Error ? error.message : "Unknown error"}`,
-      }
-    }
-  }
-
-  /**
-   * Imports principle elements from a special format
-   * @param principleElements Principle elements to import
-   * @returns Import result
-   */
-  static async importPrincipleElements(principleElements: { id: string; elements: string[] }[]): Promise<ImportResult> {
-    try {
-      // Get the storage service
-      const storageService = getStorageService()
-
-      // Load current data
-      const currentData = await storageService.loadData()
-
-      // Update principles with elements
-      let updated = 0
-      let unchanged = 0
-      const errors = 0
-
-      const updatedPrinciples = currentData.principles.map((principle) => {
-        const elementUpdate = principleElements.find((pe) => pe.id === principle.id)
-        if (elementUpdate) {
-          if (JSON.stringify(principle.elements || []) !== JSON.stringify(elementUpdate.elements)) {
-            updated++
-            return {
-              ...principle,
-              elements: elementUpdate.elements,
-            }
-          } else {
-            unchanged++
-            return principle
-          }
-        } else {
-          return principle
-        }
-      })
-
-      // Save the updated data
-      const success = await storageService.saveData({
-        ...currentData,
-        principles: updatedPrinciples,
-        lastUpdated: new Date().toISOString(),
-      })
-
-      if (success) {
-        return {
-          success: true,
-          stats: {
-            principles: updated,
-            guidelines: 0,
-            categories: 0,
-          },
-        }
-      } else {
-        throw new Error("Failed to save principle elements")
-      }
-    } catch (error) {
-      console.error("Error importing principle elements:", error)
-      return {
-        success: false,
-        error: `Error importing principle elements: ${error instanceof Error ? error.message : "Unknown error"}`,
-      }
-    }
-  }
-
-  /**
-   * Merges two StorageData objects, giving priority to the imported data
-   * @param currentData The current StorageData
-   * @param filteredData The imported StorageData
-   * @returns The merged StorageData
-   */
-  private static mergeData(currentData: StorageData, filteredData: StorageData): StorageData {
-    const mergedGuidelines = ImportService.mergeGuidelines(currentData.guidelines, filteredData.guidelines)
-    const mergedPrinciples = ImportService.mergePrinciples(currentData.principles, filteredData.principles)
-
-    return {
-      guidelines: mergedGuidelines,
-      categories: [...new Set([...currentData.categories, ...filteredData.categories])],
-      principles: mergedPrinciples,
-      lastUpdated: new Date().toISOString(),
-      version: "2.0",
     }
   }
 }

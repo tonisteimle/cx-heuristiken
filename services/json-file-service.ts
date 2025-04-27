@@ -13,6 +13,7 @@ interface StorageData {
 
 class JsonFileService {
   static async saveGuideline(guideline: Guideline): Promise<boolean> {
+    console.log("JsonFileService.saveGuideline: called for guideline", guideline.id)
     try {
       // Speichern über die API
       const response = await fetch("/api/supabase/save-guideline", {

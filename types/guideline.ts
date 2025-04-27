@@ -8,7 +8,11 @@ export interface Guideline {
   createdAt: string
   updatedAt: string
   imageUrl?: string
+  imageName?: string
+  detailImageUrl?: string
+  detailImageName?: string
   svgContent?: string
+  detailSvgContent?: string
 }
 
 export type PrincipleElement = "input" | "processing" | "decision" | "output" | "environment" | "all"

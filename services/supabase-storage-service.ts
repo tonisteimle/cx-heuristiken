@@ -1,240 +1,66 @@
 import type { StorageInterface } from "./storage-interface"
 import type { StorageData, StorageStats } from "@/types/storage-data"
-import { getSupabaseClient } from "@/lib/supabase-client"
+import { createServerSupabaseClient } from "@/lib/supabase-client"
 import type { Guideline } from "@/types/guideline"
 import { initialData } from "@/data/initial-data"
-import { chunkArray } from "@/services/storage-factory"
 
 export class SupabaseStorageService implements StorageInterface {
   private readonly BUCKET_NAME = "guidelines-images"
-  private readonly MAX_PAYLOAD_SIZE = 100000 // Define a reasonable payload size limit in bytes (100KB)
 
-  async saveData(data: StorageData, isIncremental = false): Promise<boolean> {
+  async saveData(data: StorageData): Promise<boolean> {
     try {
-      console.log("saveData called", { isIncremental, dataSize: JSON.stringify(data).length })
-      if (!data) {
-        console.error("No data provided to saveData")
-        return false
-      }
+      console.log("saveData called")
 
-      // Check payload size to decide if we need to use incremental save
-      const estimatedSize = JSON.stringify(data).length
-      const shouldUseIncremental = estimatedSize > this.MAX_PAYLOAD_SIZE || isIncremental
+      // Get the Supabase client - use server client for write operations
+      const supabase = createServerSupabaseClient()
 
-      // If payload is too large or incremental flag is true, use incremental saving
-      if (shouldUseIncremental) {
-        console.log(`Using incremental save (${estimatedSize} bytes exceeds limit or explicitly requested)`)
-        return await this.saveDataIncrementally(data)
-      } else {
-        // Non-incremental save for small payloads
-        const requestBody = JSON.stringify({ data, isIncremental: false })
-        console.log(`Non-incremental request body size: ${requestBody.length} bytes`)
-
-        const response = await fetch("/api/supabase/save-data", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: requestBody,
+      // Save the data to Supabase
+      const { error } = await supabase
+        .from("guidelines_data")
+        .update({
+          data: data,
+          updated_at: new Date().toISOString(),
         })
+        .eq("id", "main")
 
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error("Non-incremental API error response:", errorText)
-
-          // If we get a size error, fallback to incremental approach
-          if (errorText.includes("Data size too large")) {
-            console.log("Falling back to incremental save after size error")
-            return await this.saveDataIncrementally(data)
-          }
-
-          throw new Error(`API responded with status: ${response.status} - ${errorText}`)
-        }
-
-        const result = await response.json()
-        console.log("Non-incremental API result", result)
-
-        if (!result.success) {
-          console.error("Non-incremental API returned error:", result.error)
-          return false
-        }
-
-        return true
-      }
-    } catch (error) {
-      console.error("Error saving data:", error)
-      // Fallback to localStorage if the API is not reachable
-      try {
-        localStorage.setItem(
-          "guidelines_data",
-          JSON.stringify({
-            ...data,
-            lastUpdated: new Date().toISOString(),
-          }),
-        )
-        console.log("Data saved to localStorage as fallback")
-        return true
-      } catch (localStorageError) {
-        console.error("Error saving to localStorage fallback:", localStorageError)
-        return false
-      }
-    }
-  }
-
-  // Extracted incremental save logic to a separate method
-  private async saveDataIncrementally(data: StorageData): Promise<boolean> {
-    const chunkSize = 20 // Reduced chunk size to ensure smaller payloads
-    const guidelineChunks = chunkArray(data.guidelines, chunkSize)
-    let allChunksSuccessful = true
-
-    console.log(`Saving data incrementally with ${guidelineChunks.length} chunks (${chunkSize} guidelines per chunk)`)
-
-    for (let i = 0; i < guidelineChunks.length; i++) {
-      const chunk = guidelineChunks[i]
-      const chunkData: StorageData = {
-        ...data,
-        guidelines: chunk,
-      }
-
-      const requestBody = JSON.stringify({ data: chunkData, isIncremental: true })
-      console.log(`Incremental chunk ${i + 1}/${guidelineChunks.length}, size: ${requestBody.length} bytes`)
-
-      const response = await fetch("/api/supabase/save-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: requestBody,
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`Incremental chunk ${i + 1} API error response:`, errorText)
-        allChunksSuccessful = false
-
-        // Add delay to avoid overwhelming the server
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // Try one more time with a smaller chunk
-        if (chunk.length > 5) {
-          console.log(`Retrying chunk ${i + 1} with a smaller size`)
-          const smallerChunks = chunkArray(chunk, 5)
-
-          for (let j = 0; j < smallerChunks.length; j++) {
-            const smallerChunk = smallerChunks[j]
-            const smallerChunkData: StorageData = {
-              ...data,
-              guidelines: smallerChunk,
-            }
-
-            const smallerRequestBody = JSON.stringify({ data: smallerChunkData, isIncremental: true })
-            const retryResponse = await fetch("/api/supabase/save-data", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: smallerRequestBody,
-            })
-
-            if (!retryResponse.ok) {
-              console.error(`Retry failed for chunk ${i + 1}, sub-chunk ${j + 1}`)
-              return false
-            }
-
-            // Add delay between retries
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-          }
-
-          // If we got here, the retry succeeded
-          allChunksSuccessful = true
-        } else {
-          // If chunk is already small and still failing, give up
-          return false
-        }
-      }
-
-      const result = await response.json()
-      if (!result.success) {
-        console.error(`Incremental chunk ${i + 1} API returned error:`, result.error)
-        allChunksSuccessful = false
-        break
-      }
-
-      // Add delay between chunks to avoid overwhelming the server
-      await new Promise((resolve) => setTimeout(resolve, 300))
-    }
-
-    // If all guideline chunks were successful, save the categories and principles
-    if (allChunksSuccessful) {
-      const finalData: StorageData = {
-        ...data,
-        guidelines: [], // Clear guidelines to avoid exceeding size limits
-      }
-
-      const finalRequestBody = JSON.stringify({ data: finalData, isIncremental: true })
-      console.log(`Final data (categories/principles) size: ${finalRequestBody.length} bytes`)
-
-      const finalResponse = await fetch("/api/supabase/save-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: finalRequestBody,
-      })
-
-      if (!finalResponse.ok) {
-        const errorText = await finalResponse.text()
-        console.error("Final data API error response:", errorText)
-        return false
-      }
-
-      const finalResult = await finalResponse.json()
-      if (!finalResult.success) {
-        console.error("Final data API returned error:", finalResult.error)
-        return false
+      if (error) {
+        console.error("Supabase error saving data:", error)
+        throw error
       }
 
       return true
-    } else {
-      console.error("One or more guideline chunks failed to save.")
+    } catch (error) {
+      console.error("Error saving data:", error)
       return false
     }
   }
 
   async loadData(): Promise<StorageData> {
     try {
-      const response = await fetch("/api/supabase/load-data")
+      // Use server client for better reliability
+      const supabase = createServerSupabaseClient()
 
-      if (!response.ok) {
-        throw new Error(`API responded with status: ${response.status}`)
+      console.log("Attempting to load data from Supabase...")
+
+      const { data, error } = await supabase.from("guidelines_data").select("data").eq("id", "main").single()
+
+      if (error) {
+        console.error("Supabase error loading data:", error)
+        throw error
       }
 
-      const result = await response.json()
-
-      if (result.success) {
-        return result.data
+      if (data && data.data) {
+        console.log("Data loaded successfully from Supabase")
+        return data.data as StorageData
       } else {
-        console.error("Error loading data from API:", result.error)
-        // Try to load from localStorage if the API fails
-        const storedData = localStorage.getItem("guidelines_data")
-        if (storedData) {
-          console.log("Loading data from localStorage fallback")
-          return JSON.parse(storedData) as StorageData
-        }
+        console.log("No data found, returning initial data")
         return initialData
       }
     } catch (error) {
-      console.error("Error loading data from API:", error)
-      // Try to load from localStorage if the API fails
-      try {
-        const storedData = localStorage.getItem("guidelines_data")
-        if (storedData) {
-          console.log("Loading data from localStorage fallback")
-          return JSON.parse(storedData) as StorageData
-        }
-      } catch (localStorageError) {
-        console.error("Error loading from localStorage fallback:", localStorageError)
-      }
+      console.error("Error loading data:", error)
+
+      // Fallback to initial data if there's an error
+      console.log("Returning initial data due to error")
       return initialData
     }
   }
@@ -307,7 +133,7 @@ export class SupabaseStorageService implements StorageInterface {
       // Try to get statistics from Supabase
       try {
         // Get the Supabase client
-        const supabase = getSupabaseClient()
+        const supabase = createServerSupabaseClient()
 
         // Get the list of files in the bucket to count them
         const { data: files, error } = await supabase.storage.from(this.BUCKET_NAME).list()
@@ -399,10 +225,17 @@ export class SupabaseStorageService implements StorageInterface {
 
       if (index >= 0) {
         // Update the existing guideline
-        data.guidelines[index] = guideline
+        data.guidelines[index] = {
+          ...guideline,
+          updatedAt: new Date().toISOString(), // Ensure updatedAt is an ISO string
+        }
       } else {
         // Add a new guideline
-        data.guidelines.push(guideline)
+        data.guidelines.push({
+          ...guideline,
+          createdAt: guideline.createdAt || new Date().toISOString(), // Generate new createdAt timestamp if not exists
+          updatedAt: new Date().toISOString(), // Ensure updatedAt is an ISO string
+        })
       }
 
       // Save the updated data

@@ -78,7 +78,7 @@ export class IncrementalImportService {
 
       // Ensure dates are valid
       const createdAt = guideline.createdAt || new Date().toISOString()
-      const updatedAt = guideline.updatedAt || new Date().toISOString()
+      const updatedAt = new Date().toISOString()
 
       return {
         ...guideline,
