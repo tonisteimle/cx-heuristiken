@@ -196,8 +196,18 @@ export class ImportService {
 
           console.log(`Gefundene bestehende Guidelines: ${Object.keys(existingGuidelines).length}`)
 
+          // Debug: Überprüfe SVG-Inhalte in importierten Daten
+          let importSvgCount = 0
+          for (const guideline of importData.guidelines) {
+            if (guideline.svgContent) {
+              importSvgCount++
+              console.log(`SVG in importierter Guideline ${guideline.id}: ${guideline.svgContent.substring(0, 50)}...`)
+            }
+          }
+          console.log(`SVGs in importierten Daten gefunden: ${importSvgCount}`)
+
           // Erhöhe die Chunk-Größe für bessere Performance
-          const CHUNK_SIZE = 200 // Vorher war es wahrscheinlich 100
+          const CHUNK_SIZE = 100 // Kleinere Chunks für bessere Zuverlässigkeit
 
           // Verarbeite Guidelines in Batches für bessere Performance
           const guidelineBatches = []
@@ -213,7 +223,7 @@ export class ImportService {
                   // Prüfe, ob eine bestehende Guideline mit dieser ID existiert
                   const existingGuideline = guideline.id ? existingGuidelines[guideline.id] : null
 
-                  // Ensure guideline has required fields
+                  // Explizit alle Felder kopieren, um sicherzustellen, dass nichts verloren geht
                   const processedGuideline: Guideline = {
                     id: guideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                     title: guideline.title || "Untitled",
@@ -222,34 +232,20 @@ export class ImportService {
                     principles: Array.isArray(guideline.principles) ? guideline.principles : [],
                     createdAt: guideline.createdAt || new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
-                    // SVG-Inhalte mit Priorität behandeln:
-                    // 1. Wenn die importierte Guideline SVG-Inhalte hat, verwende diese
-                    // 2. Wenn nicht und eine bestehende Guideline existiert, behalte deren SVG-Inhalte
-                    // 3. Ansonsten keine SVG-Inhalte
-                    ...(guideline.svgContent
-                      ? { svgContent: guideline.svgContent }
-                      : existingGuideline?.svgContent
-                        ? { svgContent: existingGuideline.svgContent }
-                        : {}),
+                    justification: guideline.justification || existingGuideline?.justification || "",
 
-                    ...(guideline.detailSvgContent
-                      ? { detailSvgContent: guideline.detailSvgContent }
-                      : existingGuideline?.detailSvgContent
-                        ? { detailSvgContent: existingGuideline.detailSvgContent }
-                        : {}),
+                    // Explizit alle SVG- und Bild-Felder kopieren
+                    svgContent: guideline.svgContent || existingGuideline?.svgContent || undefined,
+                    detailSvgContent: guideline.detailSvgContent || existingGuideline?.detailSvgContent || undefined,
+                    imageUrl: guideline.imageUrl || existingGuideline?.imageUrl || undefined,
+                    imageName: guideline.imageName || existingGuideline?.imageName || undefined,
+                    detailImageUrl: guideline.detailImageUrl || existingGuideline?.detailImageUrl || undefined,
+                    detailImageName: guideline.detailImageName || existingGuideline?.detailImageName || undefined,
+                  }
 
-                    // Ähnlich für imageUrl und justification
-                    ...(guideline.imageUrl
-                      ? { imageUrl: guideline.imageUrl }
-                      : existingGuideline?.imageUrl
-                        ? { imageUrl: existingGuideline.imageUrl }
-                        : {}),
-
-                    ...(guideline.justification
-                      ? { justification: guideline.justification }
-                      : existingGuideline?.justification
-                        ? { justification: existingGuideline.justification }
-                        : {}),
+                  // Debug: Überprüfe, ob SVG-Inhalte korrekt übernommen wurden
+                  if (guideline.svgContent && !processedGuideline.svgContent) {
+                    console.warn(`SVG-Inhalt ging verloren für Guideline ${guideline.id}`)
                   }
 
                   // Zähle SVGs
@@ -269,6 +265,16 @@ export class ImportService {
               })
               .filter(Boolean)
 
+            // Debug: Überprüfe verarbeitete Guidelines
+            console.log(`Batch mit ${processedGuidelines.length} Guidelines verarbeitet`)
+            let batchSvgCount = 0
+            for (const guideline of processedGuidelines) {
+              if (guideline.svgContent) {
+                batchSvgCount++
+              }
+            }
+            console.log(`SVGs in verarbeitetem Batch: ${batchSvgCount}`)
+
             // Batch-Speicherung für bessere Performance
             try {
               const response = await fetch("/api/supabase/batch-save-guidelines", {
@@ -282,6 +288,8 @@ export class ImportService {
               if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
                 console.error(`API error: ${response.status} ${errorData.error || response.statusText}`)
+              } else {
+                console.log(`Batch erfolgreich gespeichert`)
               }
             } catch (apiError) {
               console.error(`Error saving guidelines batch via API:`, apiError)

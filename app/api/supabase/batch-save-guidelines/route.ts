@@ -1,74 +1,88 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from "next/server"
+import { createServerSupabaseClient } from "@/lib/supabase-client"
 
-// Direct implementation instead of using the createApiHandler
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // Initialize Supabase client
-    const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "")
+    console.log("batch-save-guidelines: Received request")
 
-    // Parse request data safely
+    // Parse request body
     let requestData
     try {
       requestData = await request.json()
+      console.log(`batch-save-guidelines: Parsed request data with ${requestData.guidelines?.length || 0} guidelines`)
     } catch (error) {
-      console.error("Error parsing JSON:", error)
-      return NextResponse.json({ success: false, error: "Invalid JSON in request" }, { status: 400 })
+      console.error("batch-save-guidelines: Error parsing request JSON:", error)
+      return NextResponse.json({ success: false, error: "Invalid JSON in request body" }, { status: 400 })
     }
 
-    console.log("batchSaveGuidelinesHandler: Received request", {
-      guidelinesCount: requestData.guidelines?.length || 0,
-    })
+    const { guidelines } = requestData
 
-    if (!Array.isArray(requestData.guidelines) || requestData.guidelines.length === 0) {
+    if (!Array.isArray(guidelines) || guidelines.length === 0) {
+      console.error("batch-save-guidelines: No guidelines provided or invalid format")
       return NextResponse.json({ success: false, error: "No guidelines provided or invalid format" }, { status: 400 })
     }
 
-    // Fetch current data
-    const { data: currentData, error: fetchError } = await supabase
+    // Debug: Überprüfe SVG-Inhalte in den Guidelines
+    let svgCount = 0
+    for (const guideline of guidelines) {
+      if (guideline.svgContent) {
+        svgCount++
+      }
+    }
+    console.log(`batch-save-guidelines: ${svgCount} von ${guidelines.length} Guidelines haben SVG-Inhalte`)
+
+    // Get Supabase client
+    const supabase = createServerSupabaseClient()
+
+    // Load current data to get the guidelines array
+    const { data: currentData, error: loadError } = await supabase
       .from("guidelines_data")
       .select("data")
       .eq("id", "main")
       .single()
 
-    if (fetchError) {
-      console.error("Error fetching current data:", fetchError)
-      return NextResponse.json(
-        { success: false, error: `Failed to fetch current data: ${fetchError.message}` },
-        { status: 500 },
-      )
+    if (loadError) {
+      console.error("batch-save-guidelines: Error loading current data:", loadError)
+      return NextResponse.json({ success: false, error: loadError.message }, { status: 500 })
     }
 
-    // Create a map of existing guidelines for quick access
-    const existingGuidelines = new Map()
-    if (currentData?.data?.guidelines) {
-      for (const guideline of currentData.data.guidelines) {
-        if (guideline && guideline.id) {
-          existingGuidelines.set(guideline.id, guideline)
-        }
+    if (!currentData || !currentData.data) {
+      console.error("batch-save-guidelines: No current data found")
+      return NextResponse.json({ success: false, error: "No current data found" }, { status: 500 })
+    }
+
+    const currentGuidelines = currentData.data.guidelines || []
+
+    // Create a map of existing guidelines for faster lookup
+    const guidelinesMap = new Map()
+    for (const guideline of currentGuidelines) {
+      if (guideline && guideline.id) {
+        guidelinesMap.set(guideline.id, guideline)
       }
     }
 
-    // Update or add guidelines
-    const updatedGuidelines = [...(currentData?.data?.guidelines || [])]
-    const processedIds = new Set()
-
-    for (const guideline of requestData.guidelines) {
-      if (!guideline || !guideline.id) continue
-
-      processedIds.add(guideline.id)
-      const index = updatedGuidelines.findIndex((g) => g.id === guideline.id)
-
-      if (index >= 0) {
+    // Update or add new guidelines
+    for (const guideline of guidelines) {
+      if (guidelinesMap.has(guideline.id)) {
         // Update existing guideline
-        updatedGuidelines[index] = guideline
+        guidelinesMap.set(guideline.id, {
+          ...guideline,
+          updatedAt: new Date().toISOString(),
+        })
       } else {
         // Add new guideline
-        updatedGuidelines.push(guideline)
+        guidelinesMap.set(guideline.id, {
+          ...guideline,
+          createdAt: guideline.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
       }
     }
 
-    // Update data in the database
+    // Convert map back to array
+    const updatedGuidelines = Array.from(guidelinesMap.values())
+
+    // Update the data in Supabase
     const { error: updateError } = await supabase
       .from("guidelines_data")
       .update({
@@ -82,24 +96,24 @@ export async function POST(request: NextRequest) {
       .eq("id", "main")
 
     if (updateError) {
-      console.error("Error updating guidelines:", updateError)
-      return NextResponse.json(
-        { success: false, error: `Failed to update guidelines: ${updateError.message}` },
-        { status: 500 },
-      )
+      console.error("batch-save-guidelines: Error updating data:", updateError)
+      return NextResponse.json({ success: false, error: updateError.message }, { status: 500 })
     }
+
+    // Debug: Überprüfe, wie viele Guidelines gespeichert wurden
+    console.log(`batch-save-guidelines: ${guidelines.length} Guidelines erfolgreich gespeichert`)
 
     return NextResponse.json({
       success: true,
-      message: `Successfully processed ${requestData.guidelines.length} guidelines`,
-      updatedCount: requestData.guidelines.length,
+      message: `${guidelines.length} guidelines saved successfully`,
+      count: guidelines.length,
     })
   } catch (error) {
-    console.error("Error in batch save guidelines:", error)
+    console.error("batch-save-guidelines: Unhandled error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: `Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
