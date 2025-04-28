@@ -20,7 +20,7 @@ export const Title = React.forwardRef<HTMLHeadingElement, TypographyProps>(
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-2xl", "text-3xl", "text-4xl") : "text-3xl",
-        "font-bold tracking-tight text-gray-900",
+        "font-bold tracking-tight text-gray-900 leading-tight", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -37,7 +37,7 @@ export const Subtitle = React.forwardRef<HTMLHeadingElement, TypographyProps>(
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-xl", "text-2xl", "text-3xl") : "text-2xl",
-        "font-semibold tracking-tight text-gray-900",
+        "font-semibold tracking-tight text-gray-900 leading-tight", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -54,7 +54,7 @@ export const SectionTitle = React.forwardRef<HTMLHeadingElement, TypographyProps
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-lg", "text-xl", "text-2xl") : "text-xl",
-        "font-semibold tracking-tight text-gray-900",
+        "font-semibold tracking-tight text-gray-900 leading-tight", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -71,7 +71,7 @@ export const SubsectionTitle = React.forwardRef<HTMLHeadingElement, TypographyPr
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-base", "text-lg", "text-xl") : "text-lg",
-        "font-medium tracking-tight text-gray-900",
+        "font-medium tracking-tight text-gray-900 leading-tight", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -188,7 +188,7 @@ export const CardTitleText = React.forwardRef<HTMLHeadingElement, TypographyProp
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-base", "text-lg", "text-lg") : "text-lg",
-        "font-semibold leading-none tracking-tight text-gray-900",
+        "font-semibold leading-tight tracking-tight text-gray-900", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -205,7 +205,7 @@ export const CardDescriptionText = React.forwardRef<HTMLParagraphElement, Typogr
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-xs", "text-sm", "text-sm") : "text-sm",
-        "text-gray-500",
+        "text-gray-500 leading-normal", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -279,7 +279,7 @@ export const DialogTitleText = React.forwardRef<HTMLHeadingElement, TypographyPr
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-base", "text-lg", "text-xl") : "text-lg",
-        "font-semibold text-gray-900",
+        "font-semibold text-gray-900 leading-tight", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -296,7 +296,7 @@ export const DialogDescriptionText = React.forwardRef<HTMLParagraphElement, Typo
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-xs", "text-sm", "text-sm") : "text-sm",
-        "text-gray-500",
+        "text-gray-500 leading-normal", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
@@ -313,7 +313,7 @@ export const DialogParagraph = React.forwardRef<HTMLParagraphElement, Typography
       ref={ref}
       className={cn(
         responsive ? responsiveSize("text-sm", "text-base", "text-base") : "text-base",
-        "text-gray-700 whitespace-pre-wrap",
+        "text-gray-700 whitespace-pre-wrap leading-relaxed", // Explizite Zeilenhöhe hinzugefügt
         className,
       )}
       {...props}
