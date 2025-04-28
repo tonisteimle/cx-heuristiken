@@ -66,7 +66,7 @@ export function GuidelineDetailDialog({
           {/* Guideline Text */}
           <div>
             <h3 className="text-lg font-semibold mb-2">Guideline</h3>
-            <p>{guideline.text}</p>
+            <p className="text-muted-foreground">{guideline.text}</p>
           </div>
 
           <Separator />
@@ -74,7 +74,7 @@ export function GuidelineDetailDialog({
           {/* Begründung */}
           <div>
             <h3 className="text-lg font-semibold mb-2">Begründung</h3>
-            <p>{guideline.justification}</p>
+            <p className="text-muted-foreground">{guideline.justification}</p>
           </div>
 
           <Separator />
@@ -83,13 +83,16 @@ export function GuidelineDetailDialog({
           <div>
             <h3 className="text-lg font-semibold mb-2">Psychologische Prinzipien</h3>
             {guidelinePrinciples.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {guidelinePrinciples.map((principle) => (
-                  <p key={principle.id}>{principle.description}</p>
+                  <div key={principle.id} className="space-y-1">
+                    <h4 className="font-medium">{principle.name}</h4>
+                    <p className="text-muted-foreground">{principle.description}</p>
+                  </div>
                 ))}
               </div>
             ) : (
-              <p>Keine psychologischen Prinzipien zugeordnet.</p>
+              <p className="text-muted-foreground">Keine psychologischen Prinzipien zugeordnet.</p>
             )}
           </div>
 

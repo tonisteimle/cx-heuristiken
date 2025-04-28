@@ -1,20 +1,30 @@
-import { createApiHandler } from "@/lib/api-handler"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-// Handler für Batch-Speicherung von Guidelines
-async function batchSaveGuidelinesHandler(requestData: any, supabase: any) {
+// Direct implementation instead of using the createApiHandler
+export async function POST(request: NextRequest) {
   try {
+    // Initialize Supabase client
+    const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "")
+
+    // Parse request data safely
+    let requestData
+    try {
+      requestData = await request.json()
+    } catch (error) {
+      console.error("Error parsing JSON:", error)
+      return NextResponse.json({ success: false, error: "Invalid JSON in request" }, { status: 400 })
+    }
+
     console.log("batchSaveGuidelinesHandler: Received request", {
       guidelinesCount: requestData.guidelines?.length || 0,
     })
 
     if (!Array.isArray(requestData.guidelines) || requestData.guidelines.length === 0) {
-      return {
-        success: false,
-        error: "No guidelines provided or invalid format",
-      }
+      return NextResponse.json({ success: false, error: "No guidelines provided or invalid format" }, { status: 400 })
     }
 
-    // Hole aktuelle Daten
+    // Fetch current data
     const { data: currentData, error: fetchError } = await supabase
       .from("guidelines_data")
       .select("data")
@@ -23,13 +33,13 @@ async function batchSaveGuidelinesHandler(requestData: any, supabase: any) {
 
     if (fetchError) {
       console.error("Error fetching current data:", fetchError)
-      return {
-        success: false,
-        error: `Failed to fetch current data: ${fetchError.message}`,
-      }
+      return NextResponse.json(
+        { success: false, error: `Failed to fetch current data: ${fetchError.message}` },
+        { status: 500 },
+      )
     }
 
-    // Erstelle eine Map der bestehenden Guidelines für schnellen Zugriff
+    // Create a map of existing guidelines for quick access
     const existingGuidelines = new Map()
     if (currentData?.data?.guidelines) {
       for (const guideline of currentData.data.guidelines) {
@@ -39,7 +49,7 @@ async function batchSaveGuidelinesHandler(requestData: any, supabase: any) {
       }
     }
 
-    // Aktualisiere oder füge Guidelines hinzu
+    // Update or add guidelines
     const updatedGuidelines = [...(currentData?.data?.guidelines || [])]
     const processedIds = new Set()
 
@@ -50,15 +60,15 @@ async function batchSaveGuidelinesHandler(requestData: any, supabase: any) {
       const index = updatedGuidelines.findIndex((g) => g.id === guideline.id)
 
       if (index >= 0) {
-        // Aktualisiere bestehende Guideline
+        // Update existing guideline
         updatedGuidelines[index] = guideline
       } else {
-        // Füge neue Guideline hinzu
+        // Add new guideline
         updatedGuidelines.push(guideline)
       }
     }
 
-    // Aktualisiere die Daten in der Datenbank
+    // Update data in the database
     const { error: updateError } = await supabase
       .from("guidelines_data")
       .update({
@@ -73,24 +83,25 @@ async function batchSaveGuidelinesHandler(requestData: any, supabase: any) {
 
     if (updateError) {
       console.error("Error updating guidelines:", updateError)
-      return {
-        success: false,
-        error: `Failed to update guidelines: ${updateError.message}`,
-      }
+      return NextResponse.json(
+        { success: false, error: `Failed to update guidelines: ${updateError.message}` },
+        { status: 500 },
+      )
     }
 
-    return {
+    return NextResponse.json({
       success: true,
       message: `Successfully processed ${requestData.guidelines.length} guidelines`,
       updatedCount: requestData.guidelines.length,
-    }
+    })
   } catch (error) {
     console.error("Error in batch save guidelines:", error)
-    return {
-      success: false,
-      error: `Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`,
-    }
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      },
+      { status: 500 },
+    )
   }
 }
-
-export const POST = createApiHandler(batchSaveGuidelinesHandler)
