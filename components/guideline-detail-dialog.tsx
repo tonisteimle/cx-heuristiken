@@ -1,11 +1,18 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Pencil, Trash2 } from "lucide-react"
 import type { Guideline, Principle } from "@/types/guideline"
 import { Separator } from "@/components/ui/separator"
-import { Title } from "@/components/ui/typography"
+import {
+  Title,
+  SectionTitle,
+  SubsectionTitle,
+  DialogParagraph,
+  DialogDescriptionText,
+} from "@/components/ui/typography"
 
 interface GuidelineDetailDialogProps {
   open: boolean
@@ -35,88 +42,89 @@ export function GuidelineDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <Title className="text-2xl font-bold">{guideline.title}</Title>
-          <p className="text-sm text-muted-foreground">
+          <Title className="text-3xl font-bold mb-2">{guideline.title}</Title>
+          <DialogDescriptionText>
             Erstellt am {new Date(guideline.createdAt).toLocaleDateString()} • Aktualisiert am{" "}
             {new Date(guideline.updatedAt).toLocaleDateString()}
-          </p>
+          </DialogDescriptionText>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Bild/SVG */}
-          {(guideline.svgContent || guideline.imageUrl) && (
-            <div className="flex justify-center mb-4">
-              {guideline.svgContent ? (
-                <div
-                  className="w-48 h-48 bg-white rounded border"
-                  dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
-                />
-              ) : (
-                <img
-                  src={guideline.imageUrl || "/placeholder.svg"}
-                  alt={guideline.title}
-                  className="w-48 h-48 object-contain bg-white rounded border"
-                />
-              )}
+          {/* SVG-Anzeige */}
+          {guideline.svgContent && (
+            <div className="mb-6 flex justify-center">
+              <div
+                className="w-64 h-64 bg-white rounded-md p-4 border"
+                dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
+              />
             </div>
           )}
 
-          {/* Guideline Text */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Guideline</h3>
-            <p className="text-muted-foreground">{guideline.text}</p>
+          {/* Alternativ, wenn kein SVG vorhanden ist, aber ein Bild */}
+          {!guideline.svgContent && guideline.imageUrl && (
+            <div className="mb-6 flex justify-center">
+              <img
+                src={guideline.imageUrl || "/placeholder.svg"}
+                alt={guideline.title}
+                className="w-64 h-64 object-contain bg-white rounded-md p-4 border"
+              />
+            </div>
+          )}
+
+          {/* Guideline-Text mit grünem Rand links */}
+          <div className="border-l-4 border-[#62b4b0] bg-muted/20 p-4">
+            <div className="mb-1">
+              <span className="text-[#62b4b0] font-bold">Guideline</span>
+            </div>
+            <DialogParagraph className="text-xl">{guideline.text}</DialogParagraph>
           </div>
 
-          <Separator />
+          <Separator className="my-4" />
 
-          {/* Begründung */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Begründung</h3>
-            <p className="text-muted-foreground">{guideline.justification}</p>
+          {/* Zwei-Spalten-Layout für Begründung und Prinzipien */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Begründung */}
+            <div className="space-y-2">
+              <SubsectionTitle className="font-bold">BEGRÜNDUNG</SubsectionTitle>
+              <DialogParagraph>{guideline.justification}</DialogParagraph>
+            </div>
+
+            {/* Psychologische Prinzipien */}
+            <div className="space-y-2">
+              <SubsectionTitle className="font-bold">PSYCHOLOGISCHE PRINZIPIEN</SubsectionTitle>
+              {guidelinePrinciples.length > 0 ? (
+                <div className="space-y-4">
+                  {guidelinePrinciples.map((principle) => (
+                    <DialogParagraph key={principle.id}>{principle.description}</DialogParagraph>
+                  ))}
+                </div>
+              ) : (
+                <DialogParagraph>Keine psychologischen Prinzipien zugeordnet.</DialogParagraph>
+              )}
+            </div>
           </div>
-
-          <Separator />
-
-          {/* Psychologische Prinzipien */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Psychologische Prinzipien</h3>
-            {guidelinePrinciples.length > 0 ? (
-              <div className="space-y-4">
-                {guidelinePrinciples.map((principle) => (
-                  <div key={principle.id} className="space-y-1">
-                    <h4 className="font-medium">{principle.name}</h4>
-                    <p className="text-muted-foreground">{principle.description}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">Keine psychologischen Prinzipien zugeordnet.</p>
-            )}
-          </div>
-
-          <Separator />
 
           {/* Kategorien */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Kategorien</h3>
-            <div className="flex flex-wrap gap-2">
+          <div className="mt-6">
+            <SectionTitle className="font-bold mb-4">Kategorien</SectionTitle>
+            <div className="flex flex-wrap gap-3">
               {guideline.categories.map((category) => (
-                <span
+                <Badge
                   key={category}
-                  className="px-2 py-1 bg-gray-100 rounded text-sm cursor-pointer"
+                  className="bg-[#62b4b0] text-white px-4 py-3 cursor-pointer"
                   onClick={() => onCategorySelect(category)}
                 >
                   {category}
-                </span>
+                </Badge>
               ))}
             </div>
           </div>
         </div>
 
         {/* Footer mit Aktionen */}
-        <DialogFooter className="border-t pt-4">
+        <DialogFooter className="flex justify-between items-center border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Schließen
           </Button>
@@ -128,8 +136,9 @@ export function GuidelineDetailDialog({
                   onEdit(guideline)
                   onOpenChange(false)
                 }}
+                className="flex items-center gap-1"
               >
-                <Pencil size={16} className="mr-2" />
+                <Pencil size={16} />
                 Bearbeiten
               </Button>
               <Button
@@ -138,10 +147,16 @@ export function GuidelineDetailDialog({
                   onDelete(guideline.id)
                   onOpenChange(false)
                 }}
+                className="flex items-center gap-1 text-muted-foreground"
               >
-                <Trash2 size={16} className="mr-2" />
+                <Trash2 size={16} />
                 Löschen
               </Button>
+            </div>
+          )}
+          {guideline.svgContent && (
+            <div className="text-xs text-muted-foreground mt-2">
+              SVG vorhanden: {guideline.svgContent.length} Zeichen
             </div>
           )}
         </DialogFooter>

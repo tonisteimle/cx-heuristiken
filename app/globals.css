@@ -88,21 +88,6 @@ body {
   body {
     @apply bg-background text-foreground font-sans;
   }
-
-  /* Explizite Zeilenhöhen für Überschriften */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply leading-tight;
-  }
-
-  /* Explizite Zeilenhöhen für Text */
-  p {
-    @apply leading-relaxed;
-  }
 }
 
 /* Tailwind-Konfiguration für die Schriftart */
