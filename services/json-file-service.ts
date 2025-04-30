@@ -89,6 +89,43 @@ class JsonFileService {
     }
   }
 
+  static async deleteGuideline(id: string): Promise<boolean> {
+    try {
+      // Verwende den StorageService zum Löschen
+      // Assuming storageService is available on JsonFileService, possibly through dependency injection or similar
+      // This is a placeholder, replace with the actual way to access storageService
+      if (!JsonFileService.storageService || !JsonFileService.storageService.deleteGuideline) {
+        console.error("Storage service not initialized or deleteGuideline method not available.")
+        return false
+      }
+
+      const success = await JsonFileService.storageService.deleteGuideline(id)
+
+      if (!success) {
+        throw new Error(`Failed to delete guideline with ID ${id}`)
+      }
+
+      // Assuming logDebug is available on JsonFileService, possibly through inheritance or similar
+      // This is a placeholder, replace with the actual way to access logDebug
+      if (JsonFileService.logDebug) {
+        await JsonFileService.logDebug(`Deleted guideline with ID ${id}`)
+      } else {
+        console.log(`Deleted guideline with ID ${id}`) // Fallback if logDebug is not available
+      }
+      return true
+    } catch (error) {
+      // Assuming logDebug is available on JsonFileService, possibly through inheritance or similar
+      // This is a placeholder, replace with the actual way to access logDebug
+      if (JsonFileService.logDebug) {
+        await JsonFileService.logDebug(`Error deleting guideline with ID ${id}`, error)
+      } else {
+        console.error(`Error deleting guideline with ID ${id}`, error) // Fallback if logDebug is not available
+      }
+      console.error("Error deleting guideline:", error)
+      return false
+    }
+  }
+
   // Hilfsmethode zum Extrahieren von Base64-Bildern
   static extractBase64Images(data: StorageData): { count: number; totalSize: number } {
     let count = 0

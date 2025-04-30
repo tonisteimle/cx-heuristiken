@@ -63,8 +63,8 @@
     "@mui/material-pigment-css": "latest",
     "@mui/material": "latest",
     "@supabase/supabase-js": "latest",
-    "uuid": "latest",
     "ajv": "latest",
+    "uuid": "latest",
     "@mui/icons-material": "latest"
   },
   "devDependencies": {

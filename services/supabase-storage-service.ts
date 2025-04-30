@@ -262,8 +262,14 @@ export class SupabaseStorageService implements StorageInterface {
         if (result.success) {
           return true
         }
+
+        // Wenn die API einen Fehler zurückgibt, werfen wir ihn
+        if (!result.success) {
+          throw new Error(result.error || "Unbekannter Fehler beim Löschen der Guideline")
+        }
       } catch (apiError) {
         console.error("Error deleting guideline via API:", apiError)
+        throw apiError // Wichtig: Fehler weiterwerfen, damit der Fallback aktiviert wird
       }
 
       // Fallback: Delete the guideline locally
