@@ -37,8 +37,8 @@ export function GuidelineDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <h2 className="text-xl font-semibold text-black">{guideline.title}</h2>
+        <DialogHeader className="space-y-2 pb-2">
+          <h2 className="text-xl font-semibold text-black px-0 py-1">{guideline.title}</h2>
           <MutedText className="text-xs">
             Erstellt am {new Date(guideline.createdAt).toLocaleDateString()} • Aktualisiert am{" "}
             {new Date(guideline.updatedAt).toLocaleDateString()}
