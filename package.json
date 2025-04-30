@@ -65,7 +65,8 @@
     "@supabase/supabase-js": "latest",
     "ajv": "latest",
     "uuid": "latest",
-    "@mui/icons-material": "latest"
+    "@mui/icons-material": "latest",
+    "@supabase/auth-helpers-nextjs": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

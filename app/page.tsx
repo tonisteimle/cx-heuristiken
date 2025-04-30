@@ -1,7 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { PlusCircle, ArrowLeft, AlertCircle, RefreshCw, BookOpen, FileText, Download } from "lucide-react"
+import {
+  PlusCircle,
+  ArrowLeft,
+  AlertCircle,
+  RefreshCw,
+  BookOpen,
+  FileText,
+  Download,
+  Search,
+  X,
+  LayoutGrid,
+  List,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -18,6 +30,8 @@ import type { Guideline, Principle, PrincipleElement } from "@/types/guideline"
 import { getStorageService } from "@/services/storage-factory"
 import { UnifiedImportDialogTrigger } from "@/components/unified-import-dialog-trigger"
 import { ExportOptionsDialog, type ExportOptions } from "@/components/export-options-dialog"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Input } from "@/components/ui/input"
 
 function GuidelinesManager() {
   const { toast } = useToast()
@@ -221,9 +235,9 @@ function GuidelinesManager() {
       ) : (
         <div className="flex flex-col">
           {/* Combined header and search container with continuous background */}
-          <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
+          <div className="fixed top-0 left-0 right-0 z-50 bg-white">
             {/* Header section */}
-            <div className="container mx-auto px-4 border-b">
+            <div className="container mx-auto px-4">
               <div className="flex justify-between items-center py-4">
                 {/* Linker Bereich: Titel */}
                 <h1 className="text-2xl font-bold text-gray-700">CX Guidelines</h1>
@@ -286,21 +300,58 @@ function GuidelinesManager() {
 
             {/* Pass the combined header height to child components */}
             {activeTab === "guidelines" && !state.isLoading && (
-              <GuidelineList
-                guidelines={state.guidelines}
-                principles={state.principles}
-                onEdit={handleEdit}
-                onDelete={handleDeleteGuideline}
-                isAuthenticated={isAuthenticated}
-                headerHeight={0}
-                inFixedHeader={true}
-                searchTerm={searchTermGuidelines}
-                onSearchChange={setSearchTermGuidelines}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                viewMode={guidelinesViewMode}
-                onViewModeChange={setGuidelinesViewMode}
-              />
+              <div className="container mx-auto px-4 py-4">
+                <div className="flex flex-wrap items-center gap-4 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Guidelines durchsuchen..."
+                      value={searchTermGuidelines}
+                      onChange={(e) => setSearchTermGuidelines(e.target.value)}
+                      className="pl-9"
+                    />
+                    {searchTermGuidelines && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                        onClick={() => setSearchTermGuidelines("")}
+                      >
+                        <X size={14} />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    {
+                      state.guidelines.filter(
+                        (g) =>
+                          (searchTermGuidelines === "" ||
+                            g.title.toLowerCase().includes(searchTermGuidelines.toLowerCase()) ||
+                            g.text.toLowerCase().includes(searchTermGuidelines.toLowerCase())) &&
+                          (selectedCategory === null || g.categories.includes(selectedCategory)),
+                      ).length
+                    }{" "}
+                    von {state.guidelines.length}
+                    {(searchTermGuidelines || selectedCategory) && " (gefiltert)"}
+                  </div>
+
+                  <div className="flex gap-2 ml-auto">
+                    <ToggleGroup
+                      type="single"
+                      value={guidelinesViewMode}
+                      onValueChange={(value) => value && setGuidelinesViewMode(value as "grid" | "list")}
+                    >
+                      <ToggleGroupItem value="grid" size="sm" aria-label="Kachelansicht">
+                        <LayoutGrid size={16} />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="list" size="sm" aria-label="Listenansicht">
+                        <List size={16} />
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                </div>
+              </div>
             )}
 
             {activeTab === "principles" && !state.isLoading && (
@@ -323,7 +374,7 @@ function GuidelinesManager() {
           </div>
 
           {/* Hauptinhalt mit Abstand zum Header */}
-          <div className="mt-[200px]">
+          <div className="mt-[73px]">
             {activeTab === "guidelines" ? (
               <div>
                 {state.isLoading ? (
@@ -338,7 +389,7 @@ function GuidelinesManager() {
                     onEdit={handleEdit}
                     onDelete={handleDeleteGuideline}
                     isAuthenticated={isAuthenticated}
-                    headerHeight={200}
+                    headerHeight={73}
                     inFixedHeader={false}
                     searchTerm={searchTermGuidelines}
                     onSearchChange={setSearchTermGuidelines}
@@ -363,7 +414,7 @@ function GuidelinesManager() {
                     isAuthenticated={isAuthenticated}
                     isAddDialogOpen={isAddPrincipleDialogOpen}
                     onAddDialogOpenChange={setIsAddPrincipleDialogOpen}
-                    headerHeight={200}
+                    headerHeight={73}
                     inFixedHeader={false}
                     searchTerm={searchTermPrinciples}
                     onSearchChange={setSearchTermPrinciples}

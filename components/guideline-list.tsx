@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog"
 import type { Guideline, Principle } from "@/types/guideline"
-import { CategoryButtonFilter } from "./category-button-filter"
-import { FIXED_CATEGORIES } from "@/lib/constants"
+// Entfernen Sie diese Zeile:
+// import { CategoryButtonFilter } from "./category-button-filter"
 import GuidelineListView from "./guideline-list-view"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { GuidelineDetailDialog } from "./guideline-detail-dialog"
@@ -23,6 +23,18 @@ import {
   DialogTitleText,
   DialogDescriptionText,
 } from "@/components/ui/typography"
+import { CategorySidebar } from "./category-sidebar"
+
+const FIXED_CATEGORIES = [
+  "Usability",
+  "Accessibility",
+  "Performance",
+  "Security",
+  "Maintainability",
+  "Scalability",
+  "Internationalization",
+  "Testability",
+]
 
 interface GuidelineListProps {
   guidelines: Guideline[]
@@ -167,224 +179,234 @@ export default function GuidelineList({
         </div>
 
         {/* Kategoriefilter als Buttons - Nur die festen Kategorien anzeigen */}
-        <CategoryButtonFilter
+        {/* <CategoryButtonFilter
           selectedCategory={selectedCategory}
           onChange={setSelectedCategory}
           categoryCount={categoryUsage}
-        />
+        /> */}
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Ansicht basierend auf dem viewMode */}
-      {viewMode === "grid" ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-          {filteredGuidelines.map((guideline) => (
-            <Card
-              key={guideline.id}
-              className="flex flex-col hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => openGuidelineDetails(guideline)}
-            >
-              {/* Bild außerhalb von CardContent, damit es bis zum Rand geht */}
-              {guideline.svgContent ? (
-                <div className="relative w-full overflow-hidden rounded-t-lg flex justify-center bg-white p-4">
-                  <div
-                    dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
-                    className="w-[200px] h-[200px]"
-                    style={{ width: "200px", height: "200px" }}
-                  />
-                </div>
-              ) : guideline.imageUrl ? (
-                <div
-                  className="relative w-full overflow-hidden rounded-t-lg"
-                  style={{ paddingBottom: "calc(230 / 490 * 100%)" }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={guideline.imageUrl || "/placeholder.svg"}
-                    alt="UI-Beispiel"
-                    className="absolute inset-0 object-contain w-full h-full object-top"
-                    onError={(e) => {
-                      console.error("Error loading image in card preview")
-                      e.currentTarget.src = "/placeholder.svg"
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              <CardContent className={`p-4 pb-4 flex-1 ${guideline.imageUrl ? "" : "pt-4"}`}>
-                {/* Titel nach dem Bild, ohne Begrenzung */}
-                <CardTitleText className="mb-2">{guideline.title}</CardTitleText>
-
-                <div className="mb-2">
-                  <BodyText className="text-muted-foreground text-sm line-clamp-3">{guideline.text}</BodyText>
-                </div>
-
-                {/* Psychologische Prinzipien anzeigen, falls vorhanden */}
-                {guideline.principles && guideline.principles.length > 0 && (
-                  <div className="mt-2 border-t pt-2">
-                    <SmallText className="text-muted-foreground mb-1 flex items-center">
-                      <BookOpen size={12} className="mr-1" />
-                      <span className="font-medium">Psychologische Prinzipien</span>
-                    </SmallText>
-                    <SmallText className="text-muted-foreground line-clamp-2">
-                      {guideline.principles
-                        .map((principleId) => {
-                          const principle = principles.find((p) => p.id === principleId)
-                          return principle ? principle.name : null
-                        })
-                        .filter(Boolean)
-                        .join(", ")}
-                    </SmallText>
-                    <SmallText className="text-muted-foreground mt-1 line-clamp-2">
-                      {(() => {
-                        const firstPrincipleId = guideline.principles[0]
-                        const firstPrinciple = principles.find((p) => p.id === firstPrincipleId)
-                        return firstPrinciple ? firstPrinciple.description : ""
-                      })()}
-                    </SmallText>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {/* Nur die Kategorien anzeigen, die in FIXED_CATEGORIES enthalten sind */}
-                  {guideline.categories
-                    .filter((category) => FIXED_CATEGORIES.includes(category))
-                    .map((category) => (
-                      <Badge
-                        key={category}
-                        variant="secondary"
-                        className="text-xs px-3 py-1"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // Wenn die Kategorie bereits ausgewählt ist, entferne sie
-                          if (selectedCategory === category) {
-                            setSelectedCategory(null)
-                          } else {
-                            // Sonst füge sie hinzu
-                            setSelectedCategory(category)
-                          }
-                        }}
-                      >
-                        {category}
-                      </Badge>
-                    ))}
-                </div>
-              </CardContent>
-              {isAuthenticated && (
-                <CardFooter className="pt-2 flex justify-between border-t">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs flex items-center gap-1"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openGuidelineDetails(guideline)
-                    }}
-                  >
-                    <Info size={14} />
-                    Details
-                  </Button>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onEdit(guideline)
-                      }}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Pencil size={14} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDelete(guideline.id)
-                      }}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </CardFooter>
-              )}
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <GuidelineListView
-          guidelines={filteredGuidelines}
-          principles={principles}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          isAuthenticated={isAuthenticated}
-          onViewDetails={openGuidelineDetails}
-        />
-      )}
-
-      {/* Neuer Guideline-Detail-Dialog */}
-      <GuidelineDetailDialog
-        open={!!selectedGuideline}
-        onOpenChange={(open) => !open && setSelectedGuideline(null)}
-        guideline={selectedGuideline}
-        principles={principles}
-        isAuthenticated={isAuthenticated}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onCategorySelect={(category) => {
-          setSelectedCategory(category)
-          setSelectedGuideline(null)
-        }}
+    <div className="flex pt-16">
+      {/* Kategorien-Seitennavigation */}
+      <CategorySidebar
+        selectedCategory={selectedCategory}
+        onChange={setSelectedCategory}
+        categoryCount={categoryUsage}
       />
 
-      {/* Bild-Dialog für vergrößerte Ansicht */}
-      <Dialog open={!!selectedImageDialog} onOpenChange={(open) => !open && setSelectedImageDialog(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitleText>UI-Beispiel</DialogTitleText>
-            <DialogDescriptionText>Detailansicht des UI-Beispiels</DialogDescriptionText>
-          </DialogHeader>
-          <div className="mt-4 bg-muted rounded-md overflow-hidden">
-            {selectedImageDialog && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={selectedImageDialog || "/placeholder.svg"}
-                alt="UI-Beispiel (vergrößert)"
-                className="w-full h-auto max-h-[70vh] object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = "/placeholder.svg"
-                }}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Hauptinhalt */}
+      <div className="flex-1 space-y-6">
+        {/* Ansicht basierend auf dem viewMode */}
+        {viewMode === "grid" ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4 pt-2">
+            {filteredGuidelines.map((guideline) => (
+              <Card
+                key={guideline.id}
+                className="flex flex-col hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => openGuidelineDetails(guideline)}
+              >
+                {/* Bild außerhalb von CardContent, damit es bis zum Rand geht */}
+                {guideline.svgContent ? (
+                  <div className="relative w-full overflow-hidden rounded-t-lg flex justify-center bg-white p-4">
+                    <div
+                      dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
+                      className="w-[200px] h-[200px]"
+                      style={{ width: "200px", height: "200px" }}
+                    />
+                  </div>
+                ) : guideline.imageUrl ? (
+                  <div
+                    className="relative w-full overflow-hidden rounded-t-lg"
+                    style={{ paddingBottom: "calc(230 / 490 * 100%)" }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={guideline.imageUrl || "/placeholder.svg"}
+                      alt="UI-Beispiel"
+                      className="absolute inset-0 object-contain w-full h-full object-top"
+                      onError={(e) => {
+                        console.error("Error loading image in card preview")
+                        e.currentTarget.src = "/placeholder.svg"
+                      }}
+                    />
+                  </div>
+                ) : null}
 
-      {/* Keine Ergebnisse */}
-      {filteredGuidelines.length === 0 && (
-        <div className="text-center py-12 border rounded-lg">
-          <SectionTitle>Keine Guidelines gefunden</SectionTitle>
-          <MutedText className="mt-2">
-            Versuchen Sie, Ihre Suchkriterien anzupassen oder die Filter zurückzusetzen.
-          </MutedText>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSearchTerm("")
-              setSelectedCategory(null)
-            }}
-            className="mt-4"
-          >
-            Filter zurücksetzen
-          </Button>
-        </div>
-      )}
+                <CardContent className={`p-4 pb-4 flex-1 ${guideline.imageUrl ? "" : "pt-4"}`}>
+                  {/* Titel nach dem Bild, ohne Begrenzung */}
+                  <CardTitleText className="mb-2">{guideline.title}</CardTitleText>
+
+                  <div className="mb-2">
+                    <BodyText className="text-muted-foreground text-sm line-clamp-3">{guideline.text}</BodyText>
+                  </div>
+
+                  {/* Psychologische Prinzipien anzeigen, falls vorhanden */}
+                  {guideline.principles && guideline.principles.length > 0 && (
+                    <div className="mt-2 border-t pt-2">
+                      <SmallText className="text-muted-foreground mb-1 flex items-center">
+                        <BookOpen size={12} className="mr-1" />
+                        <span className="font-medium">Psychologische Prinzipien</span>
+                      </SmallText>
+                      <SmallText className="text-muted-foreground line-clamp-2">
+                        {guideline.principles
+                          .map((principleId) => {
+                            const principle = principles.find((p) => p.id === principleId)
+                            return principle ? principle.name : null
+                          })
+                          .filter(Boolean)
+                          .join(", ")}
+                      </SmallText>
+                      <SmallText className="text-muted-foreground mt-1 line-clamp-2">
+                        {(() => {
+                          const firstPrincipleId = guideline.principles[0]
+                          const firstPrinciple = principles.find((p) => p.id === firstPrincipleId)
+                          return firstPrinciple ? firstPrinciple.description : ""
+                        })()}
+                      </SmallText>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {/* Nur die Kategorien anzeigen, die in FIXED_CATEGORIES enthalten sind */}
+                    {guideline.categories
+                      .filter((category) => FIXED_CATEGORIES.includes(category))
+                      .map((category) => (
+                        <Badge
+                          key={category}
+                          variant="secondary"
+                          className="text-xs px-3 py-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Wenn die Kategorie bereits ausgewählt ist, entferne sie
+                            if (selectedCategory === category) {
+                              setSelectedCategory(null)
+                            } else {
+                              // Sonst füge sie hinzu
+                              setSelectedCategory(category)
+                            }
+                          }}
+                        >
+                          {category}
+                        </Badge>
+                      ))}
+                  </div>
+                </CardContent>
+                {isAuthenticated && (
+                  <CardFooter className="pt-2 flex justify-between border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs flex items-center gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openGuidelineDetails(guideline)
+                      }}
+                    >
+                      <Info size={14} />
+                      Details
+                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onEdit(guideline)
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Pencil size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDelete(guideline.id)
+                        }}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </CardFooter>
+                )}
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <GuidelineListView
+            guidelines={filteredGuidelines}
+            principles={principles}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            isAuthenticated={isAuthenticated}
+            onViewDetails={openGuidelineDetails}
+          />
+        )}
+
+        {/* Neuer Guideline-Detail-Dialog */}
+        <GuidelineDetailDialog
+          open={!!selectedGuideline}
+          onOpenChange={(open) => !open && setSelectedGuideline(null)}
+          guideline={selectedGuideline}
+          principles={principles}
+          isAuthenticated={isAuthenticated}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onCategorySelect={(category) => {
+            setSelectedCategory(category)
+            setSelectedGuideline(null)
+          }}
+        />
+
+        {/* Bild-Dialog für vergrößerte Ansicht */}
+        <Dialog open={!!selectedImageDialog} onOpenChange={(open) => !open && setSelectedImageDialog(null)}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitleText>UI-Beispiel</DialogTitleText>
+              <DialogDescriptionText>Detailansicht des UI-Beispiels</DialogDescriptionText>
+            </DialogHeader>
+            <div className="mt-4 bg-muted rounded-md overflow-hidden">
+              {selectedImageDialog && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={selectedImageDialog || "/placeholder.svg"}
+                  alt="UI-Beispiel (vergrößert)"
+                  className="w-full h-auto max-h-[70vh] object-contain"
+                  onError={(e) => {
+                    e.currentTarget.src = "/placeholder.svg"
+                  }}
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Keine Ergebnisse */}
+        {filteredGuidelines.length === 0 && (
+          <div className="text-center py-12 border rounded-lg">
+            <SectionTitle>Keine Guidelines gefunden</SectionTitle>
+            <MutedText className="mt-2">
+              Versuchen Sie, Ihre Suchkriterien anzupassen oder die Filter zurückzusetzen.
+            </MutedText>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm("")
+                setSelectedCategory(null)
+              }}
+              className="mt-4"
+            >
+              Filter zurücksetzen
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
