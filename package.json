@@ -62,10 +62,10 @@
     "@emotion/styled": "latest",
     "@mui/material-pigment-css": "latest",
     "@mui/material": "latest",
-    "@mui/icons-material": "latest",
     "@supabase/supabase-js": "latest",
     "uuid": "latest",
-    "ajv": "latest"
+    "ajv": "latest",
+    "@mui/icons-material": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

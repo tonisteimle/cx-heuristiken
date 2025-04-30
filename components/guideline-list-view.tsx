@@ -64,7 +64,7 @@ export default function GuidelineListView({
               )}
               <div>
                 <LabelText className="mb-2">Guideline</LabelText>
-                <BodyText>{guideline.text}</BodyText>
+                <BodyText className="whitespace-pre-wrap">{guideline.text}</BodyText>
               </div>
 
               {guideline.justification && (

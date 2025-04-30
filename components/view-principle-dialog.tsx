@@ -42,7 +42,7 @@ const ViewPrincipleDialog: React.FC<ViewPrincipleDialogProps> = ({ open, onClose
           </div>
           <div className="text-sm">
             <span className="font-medium">Beschreibung: </span>
-            {principle.description}
+            <p className="whitespace-pre-wrap">{principle.description}</p>
           </div>
           <div className="text-sm">
             <span className="font-medium">Kategorie: </span>

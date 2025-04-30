@@ -52,7 +52,7 @@ export default function PrincipleListView({ principles, isAuthenticated }: Princ
             <div className="space-y-4">
               <div>
                 <LabelText className="mb-2">Beschreibung</LabelText>
-                <BodyText>{principle.description}</BodyText>
+                <BodyText className="whitespace-pre-wrap">{principle.description}</BodyText>
               </div>
 
               {principle.evidenz && (

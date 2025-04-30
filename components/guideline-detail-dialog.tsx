@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Pencil, Trash2 } from "lucide-react"
 import type { Guideline, Principle } from "@/types/guideline"
 import { Separator } from "@/components/ui/separator"
-import {
-  Title,
-  SectionTitle,
-  SubsectionTitle,
-  DialogParagraph,
-  DialogDescriptionText,
-} from "@/components/ui/typography"
+import { BodyText, MutedText } from "@/components/ui/typography"
 
 interface GuidelineDetailDialogProps {
   open: boolean
@@ -42,83 +36,65 @@ export function GuidelineDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <Title className="text-3xl font-bold mb-2">{guideline.title}</Title>
-          <DialogDescriptionText>
+          <h2 className="text-xl font-semibold text-black">{guideline.title}</h2>
+          <MutedText className="text-xs">
             Erstellt am {new Date(guideline.createdAt).toLocaleDateString()} • Aktualisiert am{" "}
             {new Date(guideline.updatedAt).toLocaleDateString()}
-          </DialogDescriptionText>
+          </MutedText>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* SVG-Anzeige */}
-          {guideline.svgContent && (
-            <div className="mb-6 flex justify-center">
-              <div
-                className="w-64 h-64 bg-white rounded-md p-4 border"
-                dangerouslySetInnerHTML={{ __html: guideline.svgContent }}
-              />
-            </div>
-          )}
-
-          {/* Alternativ, wenn kein SVG vorhanden ist, aber ein Bild */}
-          {!guideline.svgContent && guideline.imageUrl && (
-            <div className="mb-6 flex justify-center">
-              <img
-                src={guideline.imageUrl || "/placeholder.svg"}
-                alt={guideline.title}
-                className="w-64 h-64 object-contain bg-white rounded-md p-4 border"
-              />
-            </div>
-          )}
-
-          {/* Guideline-Text mit grünem Rand links */}
-          <div className="border-l-4 border-[#62b4b0] bg-muted/20 p-4">
-            <div className="mb-1">
-              <span className="text-[#62b4b0] font-bold">Guideline</span>
-            </div>
-            <DialogParagraph className="text-xl">{guideline.text}</DialogParagraph>
+          {/* Guideline-Text */}
+          <div className="space-y-2">
+            <h3 className="text-base font-medium text-black">Guideline</h3>
+            <BodyText className="text-gray-700 whitespace-pre-wrap">{guideline.text}</BodyText>
           </div>
 
           <Separator className="my-4" />
 
-          {/* Zwei-Spalten-Layout für Begründung und Prinzipien */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Begründung */}
-            <div className="space-y-2">
-              <SubsectionTitle className="font-bold">BEGRÜNDUNG</SubsectionTitle>
-              <DialogParagraph>{guideline.justification}</DialogParagraph>
-            </div>
+          {/* Begründung */}
+          <div className="space-y-2">
+            <h3 className="text-base font-medium text-black">Begründung</h3>
+            <BodyText className="text-gray-700 whitespace-pre-wrap">{guideline.justification}</BodyText>
+          </div>
 
-            {/* Psychologische Prinzipien */}
-            <div className="space-y-2">
-              <SubsectionTitle className="font-bold">PSYCHOLOGISCHE PRINZIPIEN</SubsectionTitle>
-              {guidelinePrinciples.length > 0 ? (
-                <div className="space-y-4">
-                  {guidelinePrinciples.map((principle) => (
-                    <DialogParagraph key={principle.id}>{principle.description}</DialogParagraph>
-                  ))}
-                </div>
-              ) : (
-                <DialogParagraph>Keine psychologischen Prinzipien zugeordnet.</DialogParagraph>
-              )}
-            </div>
+          <Separator className="my-4" />
+
+          {/* Psychologische Prinzipien */}
+          <div className="space-y-4">
+            <h3 className="text-base font-medium text-black">Psychologische Prinzipien</h3>
+
+            {guidelinePrinciples.length > 0 ? (
+              <div className="space-y-5">
+                {guidelinePrinciples.map((principle) => (
+                  <div key={principle.id} className="bg-gray-50 p-4 rounded-md">
+                    <h4 className="text-base font-medium text-black mb-2">{principle.name}</h4>
+                    <BodyText className="text-gray-700 whitespace-pre-wrap">{principle.description}</BodyText>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <BodyText className="text-gray-500">Keine psychologischen Prinzipien zugeordnet.</BodyText>
+            )}
           </div>
 
           {/* Kategorien */}
-          <div className="mt-6">
-            <SectionTitle className="font-bold mb-4">Kategorien</SectionTitle>
-            <div className="flex flex-wrap gap-3">
+          <div className="space-y-2">
+            <h3 className="text-base font-medium text-black">Kategorien</h3>
+            <div className="flex flex-wrap gap-2">
               {guideline.categories.map((category) => (
                 <Badge
                   key={category}
-                  className="bg-[#62b4b0] text-white px-4 py-3 cursor-pointer"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 cursor-pointer"
                   onClick={() => onCategorySelect(category)}
                 >
                   {category}
                 </Badge>
               ))}
+
+              {guideline.categories.length === 0 && <MutedText>Keine Kategorien zugeordnet.</MutedText>}
             </div>
           </div>
         </div>
@@ -128,6 +104,7 @@ export function GuidelineDetailDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Schließen
           </Button>
+
           {isAuthenticated && (
             <div className="flex gap-2">
               <Button
@@ -152,11 +129,6 @@ export function GuidelineDetailDialog({
                 <Trash2 size={16} />
                 Löschen
               </Button>
-            </div>
-          )}
-          {guideline.svgContent && (
-            <div className="text-xs text-muted-foreground mt-2">
-              SVG vorhanden: {guideline.svgContent.length} Zeichen
             </div>
           )}
         </DialogFooter>
