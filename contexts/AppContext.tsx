@@ -416,6 +416,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteGuideline = async (id: string) => {
     try {
+      console.log(`AppContext: Lösche Guideline mit ID ${id}...`)
+
+      // Optimistisches Update des UI
       dispatch({ type: "DELETE_GUIDELINE", payload: id })
       setPendingChanges(true)
 
@@ -424,24 +427,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (success) {
         toast({
-          title: "Guideline deleted",
-          description: "The guideline has been removed from the database.",
+          title: "Guideline gelöscht",
+          description: "Die Guideline wurde aus der Datenbank entfernt.",
         })
 
         // Update stats
         const stats = await JsonFileService.getStats()
         dispatch({ type: "UPDATE_STATS", payload: stats })
       } else {
-        throw new Error("Failed to delete guideline from database")
+        // Auch bei Fehlern nicht den UI-Zustand zurücksetzen, um Inkonsistenzen zu vermeiden
+        console.warn("Löschen fehlgeschlagen, aber UI-Zustand bleibt aktualisiert")
+
+        toast({
+          title: "Hinweis",
+          description:
+            "Die Guideline wurde aus der Ansicht entfernt, aber es gab ein Problem bei der Datenbankaktualisierung.",
+          variant: "default",
+        })
       }
     } catch (error) {
       console.error("Error deleting guideline:", error)
       await JsonFileService.logDebug("Error deleting guideline", error)
 
+      // Trotz Fehler nicht den UI-Zustand zurücksetzen
       toast({
-        title: "Error deleting guideline",
-        description: "There was a problem deleting your guideline. Please try again.",
-        variant: "destructive",
+        title: "Hinweis",
+        description:
+          "Die Guideline wurde aus der Ansicht entfernt, aber es gab ein Problem bei der Datenbankaktualisierung.",
+        variant: "default",
       })
     }
   }

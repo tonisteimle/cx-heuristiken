@@ -248,6 +248,8 @@ export class SupabaseStorageService implements StorageInterface {
 
   async deleteGuideline(id: string): Promise<boolean> {
     try {
+      console.log(`Versuche, Guideline mit ID ${id} zu löschen...`)
+
       // First try to delete the guideline via the API
       try {
         const response = await fetch("/api/supabase/delete-guideline", {
@@ -258,8 +260,14 @@ export class SupabaseStorageService implements StorageInterface {
           body: JSON.stringify({ id }),
         })
 
+        // Log the raw response for debugging
+        console.log(`API-Antwort Status: ${response.status}`)
+
         const result = await response.json()
+        console.log(`API-Antwort Inhalt:`, result)
+
         if (result.success) {
+          console.log(`Guideline mit ID ${id} erfolgreich gelöscht`)
           return true
         }
 
@@ -269,17 +277,30 @@ export class SupabaseStorageService implements StorageInterface {
         }
       } catch (apiError) {
         console.error("Error deleting guideline via API:", apiError)
-        throw apiError // Wichtig: Fehler weiterwerfen, damit der Fallback aktiviert wird
+
+        // Fallback aktivieren
+        console.log("Verwende Fallback-Methode zum Löschen...")
       }
 
       // Fallback: Delete the guideline locally
+      console.log("Fallback: Lösche Guideline lokal...")
       const data = await this.loadData()
 
       // Filter out the guideline to be deleted
+      const originalLength = data.guidelines.length
       data.guidelines = data.guidelines.filter((g) => g.id !== id)
 
+      // Check if anything was actually deleted
+      if (data.guidelines.length === originalLength) {
+        console.warn(`Guideline mit ID ${id} wurde nicht in den lokalen Daten gefunden`)
+        // Return true anyway to avoid UI errors
+        return true
+      }
+
       // Save the updated data
-      return await this.saveData(data)
+      const saveResult = await this.saveData(data)
+      console.log(`Lokales Speichern Ergebnis: ${saveResult}`)
+      return saveResult
     } catch (error) {
       console.error("Error deleting guideline:", error)
       return false

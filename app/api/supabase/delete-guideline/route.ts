@@ -1,21 +1,25 @@
-import { safelyParseJson, createSuccessResponse, createErrorResponse } from "@/lib/api-utils"
-import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server"
+import { createServerSupabaseClient } from "@/lib/supabase-client"
 
-// Definiere den Handler für das Löschen einer Guideline
-async function deleteGuidelineHandler(request: NextRequest, supabase: any) {
+export async function POST(request: Request) {
   try {
-    // Sicheres Parsen der JSON-Daten
-    const jsonResult = await safelyParseJson<{ id: string }>(request)
-
-    if (!jsonResult.success) {
-      return jsonResult.response
+    // Daten aus dem Request extrahieren
+    let data
+    try {
+      data = await request.json()
+    } catch (error) {
+      console.error("Fehler beim Parsen der Request-Daten:", error)
+      return NextResponse.json({ success: false, error: "Ungültiges JSON-Format" }, { status: 400 })
     }
 
-    const { id } = jsonResult.data
+    const { id } = data
 
     if (!id) {
-      return createErrorResponse("Keine Guideline-ID angegeben", 400)
+      return NextResponse.json({ success: false, error: "Keine Guideline-ID angegeben" }, { status: 400 })
     }
+
+    // Supabase-Client erstellen
+    const supabase = createServerSupabaseClient()
 
     // Lade die aktuellen Daten
     const { data: currentData, error: fetchError } = await supabase
@@ -26,12 +30,15 @@ async function deleteGuidelineHandler(request: NextRequest, supabase: any) {
 
     if (fetchError) {
       console.error("Fehler beim Laden der Daten:", fetchError)
-      return createErrorResponse(`Fehler beim Laden der Daten: ${fetchError.message}`, 500)
+      return NextResponse.json(
+        { success: false, error: `Fehler beim Laden der Daten: ${fetchError.message}` },
+        { status: 500 },
+      )
     }
 
     if (!currentData?.data?.guidelines) {
       console.warn("Keine Guidelines gefunden, aber wir betrachten das als Erfolg")
-      return createSuccessResponse({ message: "Keine Guidelines zum Löschen gefunden" })
+      return NextResponse.json({ success: true, message: "Keine Guidelines zum Löschen gefunden" }, { status: 200 })
     }
 
     // Prüfen, ob die Guideline existiert
@@ -39,7 +46,10 @@ async function deleteGuidelineHandler(request: NextRequest, supabase: any) {
 
     if (!guidelineExists) {
       console.warn(`Guideline mit ID ${id} nicht in der Datenbank gefunden, aber wir betrachten das als Erfolg`)
-      return createSuccessResponse({ message: `Guideline mit ID ${id} bereits gelöscht oder nicht vorhanden` })
+      return NextResponse.json(
+        { success: true, message: `Guideline mit ID ${id} bereits gelöscht oder nicht vorhanden` },
+        { status: 200 },
+      )
     }
 
     // Filtere die zu löschende Guideline heraus
@@ -59,24 +69,21 @@ async function deleteGuidelineHandler(request: NextRequest, supabase: any) {
 
     if (updateError) {
       console.error("Fehler beim Aktualisieren der Daten:", updateError)
-      return createErrorResponse(`Fehler beim Aktualisieren der Daten: ${updateError.message}`, 500)
+      return NextResponse.json(
+        { success: false, error: `Fehler beim Aktualisieren der Daten: ${updateError.message}` },
+        { status: 500 },
+      )
     }
 
-    return createSuccessResponse({ message: `Guideline mit ID ${id} erfolgreich gelöscht` })
+    return NextResponse.json({ success: true, message: `Guideline mit ID ${id} erfolgreich gelöscht` }, { status: 200 })
   } catch (error) {
     console.error("Unbehandelter Fehler beim Löschen der Guideline:", error)
-    return createErrorResponse(`Unbehandelter Fehler: ${error instanceof Error ? error.message : String(error)}`, 500)
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Unbehandelter Fehler: ${error instanceof Error ? error.message : String(error)}`,
+      },
+      { status: 500 },
+    )
   }
-}
-
-// Direkter Export der POST-Funktion
-export async function POST(request: NextRequest) {
-  // Supabase-Client aus dem Request-Context holen
-  const { supabase } = (request as any).supabase || {}
-
-  if (!supabase) {
-    return createErrorResponse("Supabase-Client nicht verfügbar", 500)
-  }
-
-  return deleteGuidelineHandler(request, supabase)
 }
