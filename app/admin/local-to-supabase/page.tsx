@@ -5,49 +5,120 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { createClient } from "@supabase/supabase-js"
 
 export default function LocalToSupabaseMigration() {
   const [localData, setLocalData] = useState<any>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [status, setStatus] = useState("")
+  const [status, setStatus] = useState("Lade lokale Daten...")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [exportedJson, setExportedJson] = useState<string | null>(null)
 
+  // Supabase-Konfiguration
+  const [supabaseUrl, setSupabaseUrl] = useState("")
+  const [supabaseKey, setSupabaseKey] = useState("")
+  const [configReady, setConfigReady] = useState(false)
+
   // Lade lokale Daten beim ersten Rendern
   useEffect(() => {
     try {
+      // Direkt aus dem localStorage lesen
       const data = localStorage.getItem("guidelines_data")
+      console.log("Gelesene Daten aus localStorage:", data ? "Daten gefunden" : "Keine Daten")
+
       if (data) {
-        const parsedData = JSON.parse(data)
-        setLocalData(parsedData)
-        setStatus(
-          `Lokale Daten gefunden: ${parsedData.guidelines?.length || 0} Guidelines, ${parsedData.principles?.length || 0} Prinzipien`,
-        )
+        try {
+          const parsedData = JSON.parse(data)
+          console.log("Daten erfolgreich geparst:", {
+            guidelines: parsedData.guidelines?.length || 0,
+            principles: parsedData.principles?.length || 0,
+          })
+
+          setLocalData(parsedData)
+          setStatus(
+            `Lokale Daten gefunden: ${parsedData.guidelines?.length || 0} Guidelines, ${parsedData.principles?.length || 0} Prinzipien`,
+          )
+        } catch (parseError) {
+          console.error("Fehler beim Parsen der Daten:", parseError)
+          setError("Die Daten im lokalen Speicher sind beschädigt und können nicht gelesen werden.")
+          setStatus("Fehler beim Parsen der lokalen Daten")
+        }
       } else {
+        console.log("Keine Daten im localStorage gefunden")
         setStatus("Keine lokalen Daten gefunden")
       }
     } catch (err) {
-      setError("Fehler beim Laden der lokalen Daten")
-      console.error(err)
+      console.error("Fehler beim Zugriff auf localStorage:", err)
+      setError("Fehler beim Laden der lokalen Daten: " + (err instanceof Error ? err.message : String(err)))
+      setStatus("Fehler beim Zugriff auf lokalen Speicher")
     }
   }, [])
+
+  // Überprüfe Supabase-Konfiguration
+  useEffect(() => {
+    setConfigReady(supabaseUrl.trim() !== "" && supabaseKey.trim() !== "")
+  }, [supabaseUrl, supabaseKey])
+
+  // Manuelle Datenextraktion aus localStorage
+  const extractLocalData = () => {
+    try {
+      // Alle localStorage-Schlüssel durchgehen
+      const allKeys = Object.keys(localStorage)
+      console.log("Alle localStorage-Schlüssel:", allKeys)
+
+      // Nach relevanten Daten suchen
+      const relevantData: Record<string, any> = {}
+
+      allKeys.forEach((key) => {
+        try {
+          const value = localStorage.getItem(key)
+          if (value) {
+            try {
+              const parsed = JSON.parse(value)
+              relevantData[key] = parsed
+            } catch {
+              // Wenn nicht als JSON parsbar, dann als String speichern
+              relevantData[key] = value
+            }
+          }
+        } catch (e) {
+          console.warn(`Konnte Wert für Schlüssel ${key} nicht lesen`, e)
+        }
+      })
+
+      setLocalData(relevantData)
+      setStatus("Alle lokalen Daten extrahiert")
+      setSuccess("Lokale Daten wurden erfolgreich extrahiert")
+
+      return relevantData
+    } catch (err) {
+      console.error("Fehler bei manueller Datenextraktion:", err)
+      setError("Fehler bei der manuellen Datenextraktion: " + (err instanceof Error ? err.message : String(err)))
+      return null
+    }
+  }
 
   // Exportiere lokale Daten als JSON-Datei
   const exportLocalData = () => {
     try {
       setIsExporting(true)
       setProgress(30)
+      setError(null)
 
-      if (!localData) {
-        throw new Error("Keine lokalen Daten gefunden")
+      // Wenn keine Daten vorhanden, versuche sie manuell zu extrahieren
+      const dataToExport = localData || extractLocalData()
+
+      if (!dataToExport) {
+        throw new Error("Keine lokalen Daten gefunden oder extrahierbar")
       }
 
       // JSON-String mit Formatierung erstellen
-      const jsonString = JSON.stringify(localData, null, 2)
+      const jsonString = JSON.stringify(dataToExport, null, 2)
       setExportedJson(jsonString)
 
       // Blob mit korrektem MIME-Typ erstellen
@@ -77,9 +148,9 @@ export default function LocalToSupabaseMigration() {
         setIsExporting(false)
       }, 100)
     } catch (err: any) {
-      setError(`Fehler beim Exportieren: ${err.message}`)
+      console.error("Fehler beim Exportieren:", err)
+      setError(`Fehler beim Exportieren: ${err.message || String(err)}`)
       setIsExporting(false)
-      console.error(err)
     }
   }
 
@@ -91,12 +162,22 @@ export default function LocalToSupabaseMigration() {
       setError(null)
       setSuccess(null)
 
-      if (!localData) {
-        throw new Error("Keine lokalen Daten gefunden")
+      // Überprüfe Supabase-Konfiguration
+      if (!configReady) {
+        throw new Error("Bitte gib die Supabase-URL und den Anon-Key ein")
+      }
+
+      // Wenn keine Daten vorhanden, versuche sie manuell zu extrahieren
+      const dataToImport = localData || extractLocalData()
+
+      if (!dataToImport) {
+        throw new Error("Keine lokalen Daten gefunden oder extrahierbar")
       }
 
       setStatus("Verbindung zu Supabase wird hergestellt...")
-      const supabase = createClientComponentClient()
+
+      // Erstelle Supabase-Client mit den eingegebenen Werten
+      const supabase = createClient(supabaseUrl, supabaseKey)
 
       setProgress(20)
       setStatus("Prüfe bestehende Daten in Supabase...")
@@ -114,16 +195,19 @@ export default function LocalToSupabaseMigration() {
 
       setProgress(40)
 
+      // Extrahiere die Guidelines-Daten aus dem lokalData-Objekt
+      const guidelinesData = dataToImport.guidelines_data || dataToImport
+
       if (existingData) {
         setStatus("Bestehende Daten in Supabase gefunden. Führe Daten zusammen...")
 
-        // Zusammenführen der Daten (optional)
+        // Zusammenführen der Daten
         const mergedData = {
-          guidelines: [...(existingData.data?.guidelines || []), ...(localData.guidelines || [])],
-          categories: [...new Set([...(existingData.data?.categories || []), ...(localData.categories || [])])],
-          principles: [...(existingData.data?.principles || []), ...(localData.principles || [])],
+          guidelines: [...(existingData.data?.guidelines || []), ...(guidelinesData.guidelines || [])],
+          categories: [...new Set([...(existingData.data?.categories || []), ...(guidelinesData.categories || [])])],
+          principles: [...(existingData.data?.principles || []), ...(guidelinesData.principles || [])],
           lastUpdated: new Date().toISOString(),
-          version: localData.version || "2.0",
+          version: guidelinesData.version || "2.0",
         }
 
         setProgress(60)
@@ -148,7 +232,7 @@ export default function LocalToSupabaseMigration() {
         // Erstelle neue Daten
         const { error: insertError } = await supabase.from("guidelines_data").insert({
           id: "main",
-          data: localData,
+          data: guidelinesData,
           updated_at: new Date().toISOString(),
         })
 
@@ -162,9 +246,9 @@ export default function LocalToSupabaseMigration() {
       setStatus("Migration abgeschlossen")
       setIsImporting(false)
     } catch (err: any) {
-      setError(`Fehler beim Importieren: ${err.message}`)
+      console.error("Fehler beim Importieren:", err)
+      setError(`Fehler beim Importieren: ${err.message || String(err)}`)
       setIsImporting(false)
-      console.error(err)
     }
   }
 
@@ -211,22 +295,53 @@ export default function LocalToSupabaseMigration() {
                 <p>Guidelines: {localData.guidelines?.length || 0}</p>
                 <p>Kategorien: {localData.categories?.length || 0}</p>
                 <p>Prinzipien: {localData.principles?.length || 0}</p>
-                <p>Letzte Aktualisierung: {new Date(localData.lastUpdated).toLocaleString()}</p>
+                <p>
+                  Letzte Aktualisierung:{" "}
+                  {localData.lastUpdated ? new Date(localData.lastUpdated).toLocaleString() : "Unbekannt"}
+                </p>
               </div>
             </div>
           )}
+
+          <div className="space-y-4 border p-4 rounded-md">
+            <h3 className="text-sm font-medium">Supabase-Konfiguration</h3>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="supabase-url">Supabase URL</Label>
+                <Input
+                  id="supabase-url"
+                  value={supabaseUrl}
+                  onChange={(e) => setSupabaseUrl(e.target.value)}
+                  placeholder="https://deine-projekt-id.supabase.co"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="supabase-key">Supabase Anon Key</Label>
+                <Input
+                  id="supabase-key"
+                  value={supabaseKey}
+                  onChange={(e) => setSupabaseKey(e.target.value)}
+                  placeholder="dein-anon-key"
+                  type="password"
+                />
+              </div>
+              <Alert className={configReady ? "bg-green-50" : "bg-amber-50"}>
+                <AlertDescription>
+                  {configReady
+                    ? "✅ Supabase-Konfiguration bereit"
+                    : "⚠️ Bitte gib die Supabase-URL und den Anon-Key ein"}
+                </AlertDescription>
+              </Alert>
+            </div>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={exportLocalData}
-            disabled={!localData || isExporting || isImporting}
-            className="w-full sm:w-auto"
-          >
+          <Button onClick={exportLocalData} disabled={isExporting || isImporting} className="w-full sm:w-auto">
             1. Lokale Daten sichern (JSON)
           </Button>
           <Button
             onClick={importToSupabase}
-            disabled={!localData || isExporting || isImporting}
+            disabled={isExporting || isImporting || !configReady}
             className="w-full sm:w-auto"
             variant="default"
           >
