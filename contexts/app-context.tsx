@@ -131,14 +131,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SET_LOADING", payload: true })
 
         const storageService = getStorageService()
-        const data = await storageService.loadData()
 
-        dispatch({ type: "SET_DATA", payload: data })
+        try {
+          const data = await storageService.loadData()
+          dispatch({ type: "SET_DATA", payload: data })
+        } catch (loadError) {
+          console.error("Error in loadData:", loadError)
+
+          // Check if it's a network error
+          if (
+            loadError instanceof Error &&
+            (loadError.message.includes("fetch") ||
+              loadError.message.includes("network") ||
+              loadError.message.includes("connection"))
+          ) {
+            dispatch({
+              type: "SET_ERROR",
+              payload:
+                "Netzwerkfehler: Verbindung zu Supabase konnte nicht hergestellt werden. Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+            })
+          } else {
+            dispatch({
+              type: "SET_ERROR",
+              payload: `Fehler beim Laden der Daten: ${loadError instanceof Error ? loadError.message : String(loadError)}`,
+            })
+          }
+        }
       } catch (error) {
-        console.error("Fehler beim Laden der Daten:", error)
+        console.error("Unerwarteter Fehler beim Laden der Daten:", error)
         dispatch({
           type: "SET_ERROR",
-          payload: `Fehler beim Laden der Daten: ${error instanceof Error ? error.message : String(error)}`,
+          payload: `Unerwarteter Fehler: ${error instanceof Error ? error.message : String(error)}`,
         })
       } finally {
         dispatch({ type: "SET_LOADING", payload: false })

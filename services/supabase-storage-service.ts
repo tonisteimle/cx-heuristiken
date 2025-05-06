@@ -150,70 +150,151 @@ export class SupabaseStorageService implements StorageService {
   }
 
   async loadData(): Promise<StorageData> {
-    try {
-      console.log("Versuche, Daten aus Supabase zu laden...")
+    const maxRetries = 3
+    let retryCount = 0
 
-      // Stelle sicher, dass die Tabelle existiert
-      const tableInitialized = await this.initializeTable()
-      if (!tableInitialized) {
-        console.warn("Tabelle konnte nicht initialisiert werden, verwende initiale Daten")
-        return initialData
-      }
-
-      // Versuche, Daten aus der Tabelle zu laden
+    while (retryCount < maxRetries) {
       try {
-        const { data, error } = await this.supabase.from(this.tableName).select("data").eq("id", this.recordId).single()
+        console.log(`Attempt ${retryCount + 1} to load data from Supabase...`)
 
-        if (error) {
-          // Wenn der Fehler darauf hinweist, dass keine Daten gefunden wurden
-          if (error.code === "PGRST116") {
-            console.log("Keine Daten in Supabase gefunden, verwende initiale Daten...")
+        // Check if we can connect to Supabase at all
+        try {
+          const { data: healthCheck, error: healthError } = await this.supabase
+            .from("_health")
+            .select("*")
+            .limit(1)
+            .maybeSingle()
 
-            // Speichere die initialen Daten, wenn keine Daten gefunden wurden
-            await this.saveData(initialData)
+          if (healthError) {
+            console.warn(`Supabase health check failed: ${healthError.message}`)
+            // Continue anyway, as the table we need might still be accessible
+          } else {
+            console.log("Supabase connection is healthy")
+          }
+        } catch (healthErr) {
+          console.warn(
+            `Supabase health check threw an exception: ${healthErr instanceof Error ? healthErr.message : String(healthErr)}`,
+          )
+          // Continue anyway, as this might just be a permissions issue
+        }
+
+        // Stelle sicher, dass die Tabelle existiert
+        const tableInitialized = await this.initializeTable()
+        if (!tableInitialized) {
+          console.warn("Tabelle konnte nicht initialisiert werden, verwende initiale Daten")
+          return initialData
+        }
+
+        // Versuche, Daten aus der Tabelle zu laden
+        try {
+          const { data, error } = await this.supabase
+            .from(this.tableName)
+            .select("data")
+            .eq("id", this.recordId)
+            .single()
+
+          if (error) {
+            // Wenn der Fehler darauf hinweist, dass keine Daten gefunden wurden
+            if (error.code === "PGRST116") {
+              console.log("Keine Daten in Supabase gefunden, verwende initiale Daten...")
+
+              // Speichere die initialen Daten, wenn keine Daten gefunden wurden
+              await this.saveData(initialData)
+
+              return initialData
+            }
+
+            console.error("Error loading data from Supabase:", error)
+            this.lastError = new Error(`Failed to load data: ${error.message}`)
+
+            // If this is a connection error, retry
+            if (
+              error.message.includes("fetch") ||
+              error.message.includes("network") ||
+              error.message.includes("connection")
+            ) {
+              retryCount++
+              if (retryCount < maxRetries) {
+                console.log(`Retrying (${retryCount}/${maxRetries})...`)
+                // Wait before retrying (exponential backoff)
+                await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount))
+                continue
+              }
+            }
 
             return initialData
           }
 
-          console.error("Error loading data from Supabase:", error)
-          this.lastError = new Error(`Failed to load data: ${error.message}`)
+          if (!data || !data.data) {
+            console.log("Keine gültigen Daten in Supabase gefunden, verwende initiale Daten...")
+            return initialData
+          }
+
+          console.log("Daten erfolgreich aus Supabase geladen:", JSON.stringify(data.data).substring(0, 200) + "...")
+          console.log(
+            `Loaded ${data.data.guidelines?.length || 0} guidelines and ${data.data.principles?.length || 0} principles`,
+          )
+
+          // Ensure the data has the expected structure
+          const loadedData = data.data as StorageData
+
+          // Make sure all required arrays exist
+          if (!Array.isArray(loadedData.guidelines)) loadedData.guidelines = []
+          if (!Array.isArray(loadedData.principles)) loadedData.principles = []
+          if (!Array.isArray(loadedData.categories)) loadedData.categories = []
+          if (!Array.isArray(loadedData.elements)) loadedData.elements = []
+
+          return loadedData
+        } catch (error) {
+          // Wenn ein Fehler beim Laden auftritt, versuche zu erkennen, ob die Tabelle nicht existiert
+          console.error("Fehler beim Laden der Daten:", error)
+          this.lastError = error instanceof Error ? error : new Error(String(error))
+
+          // If this is a fetch error, retry
+          if (
+            error instanceof Error &&
+            (error.message.includes("fetch") ||
+              error.message.includes("network") ||
+              error.message.includes("connection"))
+          ) {
+            retryCount++
+            if (retryCount < maxRetries) {
+              console.log(`Retrying (${retryCount}/${maxRetries})...`)
+              // Wait before retrying (exponential backoff)
+              await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount))
+              continue
+            }
+          }
+
+          // Verwende initiale Daten als Fallback
+          console.log("Verwende initiale Daten als Fallback...")
           return initialData
         }
-
-        if (!data || !data.data) {
-          console.log("Keine gültigen Daten in Supabase gefunden, verwende initiale Daten...")
-          return initialData
-        }
-
-        console.log("Daten erfolgreich aus Supabase geladen:", JSON.stringify(data.data).substring(0, 200) + "...")
-        console.log(
-          `Loaded ${data.data.guidelines?.length || 0} guidelines and ${data.data.principles?.length || 0} principles`,
-        )
-
-        // Ensure the data has the expected structure
-        const loadedData = data.data as StorageData
-
-        // Make sure all required arrays exist
-        if (!Array.isArray(loadedData.guidelines)) loadedData.guidelines = []
-        if (!Array.isArray(loadedData.principles)) loadedData.principles = []
-        if (!Array.isArray(loadedData.categories)) loadedData.categories = []
-        if (!Array.isArray(loadedData.elements)) loadedData.elements = []
-
-        return loadedData
       } catch (error) {
-        // Wenn ein Fehler beim Laden auftritt, versuche zu erkennen, ob die Tabelle nicht existiert
-        console.error("Fehler beim Laden der Daten:", error)
+        console.error("Fehler beim Laden der Daten aus Supabase:", error)
         this.lastError = error instanceof Error ? error : new Error(String(error))
 
-        // Verwende initiale Daten als Fallback
-        console.log("Verwende initiale Daten als Fallback...")
-        return initialData
+        // If this is a fetch error, retry
+        if (
+          error instanceof Error &&
+          (error.message.includes("fetch") || error.message.includes("network") || error.message.includes("connection"))
+        ) {
+          retryCount++
+          if (retryCount < maxRetries) {
+            console.log(`Retrying (${retryCount}/${maxRetries})...`)
+            // Wait before retrying (exponential backoff)
+            await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount))
+            continue
+          }
+        }
+
+        return initialData // Verwende initiale Daten als Fallback
       }
-    } catch (error) {
-      console.error("Fehler beim Laden der Daten aus Supabase:", error)
-      this.lastError = error instanceof Error ? error : new Error(String(error))
-      return initialData // Verwende initiale Daten als Fallback
     }
+
+    // If we've exhausted all retries
+    console.warn(`Failed to load data after ${maxRetries} attempts, using initial data`)
+    return initialData
   }
 
   async getStats(): Promise<{ lastUpdated: string | null }> {

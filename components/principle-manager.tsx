@@ -21,6 +21,9 @@ import { Pencil, Trash2, Search, X, LayoutGrid, List } from "lucide-react"
 import type { Principle, PrincipleElement } from "@/types/guideline"
 import { PrincipleDetailDialog } from "./principle-detail-dialog"
 
+// Importiere die Masonry-Komponenten am Anfang der Datei
+import Masonry, { ResponsiveMasonry } from "react-responsive-masonry"
+
 interface PrincipleManagerProps {
   principles: Principle[]
   onSave: (principles: Principle[]) => Promise<boolean>
@@ -55,43 +58,54 @@ export default function PrincipleManager({
   const [editingPrinciple, setEditingPrinciple] = useState<Principle | null>(null)
   const [newPrinciple, setNewPrinciple] = useState<Partial<Principle>>({
     title: "",
+    name: "",
     description: "",
     element: "ui",
+    elements: ["ui"],
   })
   const [selectedPrinciple, setSelectedPrinciple] = useState<Principle | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
 
   // Alle möglichen Elemente für die Filterung
-  const elements: PrincipleElement[] = ["all", "ui", "ux", "content", "other"]
+  const elements: PrincipleElement[] = ["all", "ui", "ux", "content", "other", "decision"]
 
   // Filtere die Principles basierend auf Suchbegriff und ausgewähltem Element
-  const filteredPrinciples = principles.filter(
-    (principle) =>
-      (searchTerm === "" ||
-        principle.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        principle.description?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (selectedElement === "all" || principle.element === selectedElement),
-  )
+  const filteredPrinciples = principles.filter((principle) => {
+    const titleMatch = (principle.title || principle.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+    const descriptionMatch = principle.description.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const elementMatch =
+      selectedElement === "all" ||
+      principle.element === selectedElement ||
+      (Array.isArray(principle.elements) && principle.elements.includes(selectedElement))
+
+    return (searchTerm === "" || titleMatch || descriptionMatch) && elementMatch
+  })
 
   const handleAddPrinciple = () => {
-    if (!newPrinciple.title || !newPrinciple.description) return
+    if (!newPrinciple.title && !newPrinciple.name) return
+    if (!newPrinciple.description) return
 
     const principle: Principle = {
       id: `principle-${Date.now()}`,
-      title: newPrinciple.title,
+      title: newPrinciple.title || "",
+      name: newPrinciple.name || newPrinciple.title || "",
       description: newPrinciple.description,
       element: (newPrinciple.element as PrincipleElement) || "other",
+      elements: newPrinciple.elements || [(newPrinciple.element as PrincipleElement) || "other"],
       createdAt: new Date().toISOString(),
     }
 
     const updatedPrinciples = [...principles, principle]
     onSave(updatedPrinciples)
-    setNewPrinciple({ title: "", description: "", element: "ui" })
+    setNewPrinciple({ title: "", name: "", description: "", element: "ui", elements: ["ui"] })
     onAddDialogOpenChange(false)
   }
 
   const handleEditPrinciple = () => {
-    if (!editingPrinciple || !editingPrinciple.title || !editingPrinciple.description) return
+    if (!editingPrinciple) return
+    if (!editingPrinciple.title && !editingPrinciple.name) return
+    if (!editingPrinciple.description) return
 
     const updatedPrinciple = {
       ...editingPrinciple,
@@ -114,6 +128,11 @@ export default function PrincipleManager({
   const openDetailDialog = (principle: Principle) => {
     setSelectedPrinciple(principle)
     setDetailDialogOpen(true)
+  }
+
+  // Funktion zum Anzeigen des Titels eines Prinzips
+  const getPrincipleTitle = (principle: Principle) => {
+    return principle.name || principle.title || ""
   }
 
   return (
@@ -192,63 +211,106 @@ export default function PrincipleManager({
           )}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPrinciples.map((principle) => (
-            <Card
-              key={principle.id}
-              className="overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => openDetailDialog(principle)}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">{principle.title}</CardTitle>
-                <Badge variant="outline" className="text-xs w-fit mt-1">
-                  {principle.element}
-                </Badge>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <p className="text-sm text-muted-foreground">{principle.description}</p>
-                {principle.imageUrl && (
-                  <div className="mt-4 h-32 overflow-hidden rounded-md">
-                    <img
-                      src={principle.imageUrl || "/placeholder.svg"}
-                      alt={principle.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg?key=sdnoa"
-                      }}
-                    />
-                  </div>
-                )}
-              </CardContent>
-              {isAuthenticated && (
-                <div className="p-4 pt-2 flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                      setEditingPrinciple(principle)
-                    }}
+        <ResponsiveMasonry columnsCountBreakPoints={{ 350: 1, 750: 2, 1100: 3, 1500: 4 }}>
+          <Masonry gutter="24px">
+            {filteredPrinciples.map((principle) => {
+              // Bestimme die Größe der Karte basierend auf dem Inhalt
+              const hasImage = !!principle.imageUrl
+              const textLength = principle.description.length
+              const hasEvidenz = !!(principle.evidenz || principle.evidence)
+
+              // Berechne eine deterministische "Zufälligkeit" basierend auf der ID
+              const hash = principle.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+              const randomFactor = hash % 3 // 0, 1, oder 2
+
+              // Bestimme die Größe basierend auf Inhalt und "Zufall"
+              let cardSize = "medium"
+              if ((textLength > 300 && (hasImage || hasEvidenz)) || randomFactor === 2) {
+                cardSize = "large"
+              } else if ((textLength < 100 && !hasImage) || randomFactor === 0) {
+                cardSize = "small"
+              }
+
+              // Bestimme die Bildhöhe basierend auf der Kartengröße
+              const imageHeight = cardSize === "small" ? "h-24" : cardSize === "large" ? "h-48" : "h-32"
+
+              return (
+                <Card
+                  key={principle.id}
+                  className={`overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-shadow mb-6`}
+                  onClick={() => openDetailDialog(principle)}
+                >
+                  <CardHeader className={`pb-2 ${cardSize === "small" ? "p-3" : cardSize === "large" ? "p-5" : "p-4"}`}>
+                    <CardTitle className={cardSize === "large" ? "text-xl" : "text-lg"}>
+                      {getPrincipleTitle(principle)}
+                    </CardTitle>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(principle.elements || [principle.element]).filter(Boolean).map((element, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {element}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardHeader>
+                  <CardContent
+                    className={`flex-grow ${cardSize === "small" ? "p-3" : cardSize === "large" ? "p-5" : "p-4"}`}
                   >
-                    <Pencil size={14} className="mr-1" />
-                    Bearbeiten
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                      handleDeletePrinciple(principle.id)
-                    }}
-                  >
-                    <Trash2 size={14} className="mr-1" />
-                    Löschen
-                  </Button>
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
+                    <p className="text-sm text-muted-foreground">{principle.description}</p>
+
+                    {/* Zeige Evidenz für große Karten an */}
+                    {cardSize === "large" && hasEvidenz && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Evidenz:</p>
+                        <p className="text-xs text-muted-foreground">{principle.evidenz || principle.evidence}</p>
+                      </div>
+                    )}
+
+                    {principle.imageUrl && (
+                      <div className={`mt-4 ${imageHeight} overflow-hidden rounded-md`}>
+                        <img
+                          src={principle.imageUrl || "/placeholder.svg"}
+                          alt={getPrincipleTitle(principle)}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder.svg?key=sdnoa"
+                          }}
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  {isAuthenticated && (
+                    <div
+                      className={`p-2 pt-1 flex justify-end gap-2 ${cardSize === "small" ? "p-2" : cardSize === "large" ? "p-3" : "p-2"}`}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                        onClick={(e) => {
+                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
+                          setEditingPrinciple(principle)
+                        }}
+                      >
+                        <Pencil size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                        onClick={(e) => {
+                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
+                          handleDeletePrinciple(principle.id)
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </Masonry>
+        </ResponsiveMasonry>
       ) : (
         <div className="space-y-4">
           {filteredPrinciples.map((principle) => (
@@ -260,10 +322,14 @@ export default function PrincipleManager({
               <div className="p-4">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-lg font-semibold">{principle.title}</h3>
-                    <Badge variant="outline" className="text-xs mt-1">
-                      {principle.element}
-                    </Badge>
+                    <h3 className="text-lg font-semibold">{getPrincipleTitle(principle)}</h3>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(principle.elements || [principle.element]).filter(Boolean).map((element, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {element}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                   {isAuthenticated && (
                     <div className="flex gap-2">
@@ -297,7 +363,7 @@ export default function PrincipleManager({
                   <div className="mt-4 h-32 overflow-hidden rounded-md">
                     <img
                       src={principle.imageUrl || "/placeholder.svg"}
-                      alt={principle.title}
+                      alt={getPrincipleTitle(principle)}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.src = "/placeholder.svg?key=sdnoa"
@@ -313,7 +379,7 @@ export default function PrincipleManager({
 
       {/* Dialog zum Hinzufügen eines neuen Prinzips */}
       <Dialog open={isAddDialogOpen} onOpenChange={onAddDialogOpenChange}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Neues Prinzip hinzufügen</DialogTitle>
             <DialogDescription>Fügen Sie ein neues psychologisches Prinzip hinzu.</DialogDescription>
@@ -325,8 +391,8 @@ export default function PrincipleManager({
               </Label>
               <Input
                 id="name"
-                value={newPrinciple.title || ""}
-                onChange={(e) => setNewPrinciple({ ...newPrinciple, title: e.target.value })}
+                value={newPrinciple.name || ""}
+                onChange={(e) => setNewPrinciple({ ...newPrinciple, name: e.target.value, title: e.target.value })}
                 className="col-span-3"
               />
             </div>
@@ -336,7 +402,14 @@ export default function PrincipleManager({
               </Label>
               <Select
                 value={newPrinciple.element || "ui"}
-                onValueChange={(value) => setNewPrinciple({ ...newPrinciple, element: value as PrincipleElement })}
+                onValueChange={(value) => {
+                  const elementValue = value as PrincipleElement
+                  setNewPrinciple({
+                    ...newPrinciple,
+                    element: elementValue,
+                    elements: [elementValue],
+                  })
+                }}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Element auswählen" />
@@ -364,6 +437,30 @@ export default function PrincipleManager({
                 rows={4}
               />
             </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="evidenz" className="text-right pt-2">
+                Evidenz
+              </Label>
+              <Textarea
+                id="evidenz"
+                value={newPrinciple.evidenz || ""}
+                onChange={(e) => setNewPrinciple({ ...newPrinciple, evidenz: e.target.value })}
+                className="col-span-3"
+                rows={4}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="implikation" className="text-right pt-2">
+                Implikation
+              </Label>
+              <Textarea
+                id="implikation"
+                value={newPrinciple.implikation || ""}
+                onChange={(e) => setNewPrinciple({ ...newPrinciple, implikation: e.target.value })}
+                className="col-span-3"
+                rows={4}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button type="submit" onClick={handleAddPrinciple}>
@@ -375,7 +472,7 @@ export default function PrincipleManager({
 
       {/* Dialog zum Bearbeiten eines Prinzips */}
       <Dialog open={!!editingPrinciple} onOpenChange={(open) => !open && setEditingPrinciple(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Prinzip bearbeiten</DialogTitle>
             <DialogDescription>Bearbeiten Sie die Details des Prinzips.</DialogDescription>
@@ -388,8 +485,14 @@ export default function PrincipleManager({
                 </Label>
                 <Input
                   id="edit-name"
-                  value={editingPrinciple.title}
-                  onChange={(e) => setEditingPrinciple({ ...editingPrinciple, title: e.target.value })}
+                  value={editingPrinciple.name || editingPrinciple.title || ""}
+                  onChange={(e) =>
+                    setEditingPrinciple({
+                      ...editingPrinciple,
+                      name: e.target.value,
+                      title: e.target.value,
+                    })
+                  }
                   className="col-span-3"
                 />
               </div>
@@ -398,10 +501,15 @@ export default function PrincipleManager({
                   Element
                 </Label>
                 <Select
-                  value={editingPrinciple.element}
-                  onValueChange={(value) =>
-                    setEditingPrinciple({ ...editingPrinciple, element: value as PrincipleElement })
-                  }
+                  value={editingPrinciple.element || "other"}
+                  onValueChange={(value) => {
+                    const elementValue = value as PrincipleElement
+                    setEditingPrinciple({
+                      ...editingPrinciple,
+                      element: elementValue,
+                      elements: [elementValue],
+                    })
+                  }}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Element auswählen" />
@@ -425,6 +533,36 @@ export default function PrincipleManager({
                   id="edit-description"
                   value={editingPrinciple.description}
                   onChange={(e) => setEditingPrinciple({ ...editingPrinciple, description: e.target.value })}
+                  className="col-span-3"
+                  rows={4}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-evidenz" className="text-right pt-2">
+                  Evidenz
+                </Label>
+                <Textarea
+                  id="edit-evidenz"
+                  value={editingPrinciple.evidenz || editingPrinciple.evidence || ""}
+                  onChange={(e) =>
+                    setEditingPrinciple({
+                      ...editingPrinciple,
+                      evidenz: e.target.value,
+                      evidence: e.target.value,
+                    })
+                  }
+                  className="col-span-3"
+                  rows={4}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-implikation" className="text-right pt-2">
+                  Implikation
+                </Label>
+                <Textarea
+                  id="edit-implikation"
+                  value={editingPrinciple.implikation || ""}
+                  onChange={(e) => setEditingPrinciple({ ...editingPrinciple, implikation: e.target.value })}
                   className="col-span-3"
                   rows={4}
                 />

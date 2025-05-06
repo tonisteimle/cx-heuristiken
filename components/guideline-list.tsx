@@ -10,6 +10,9 @@ import { Pencil, Trash2, Search, X, LayoutGrid, List } from "lucide-react"
 import type { Guideline, Principle } from "@/types/guideline"
 import { GuidelineDetailDialog } from "./guideline-detail-dialog"
 
+// Importiere die Masonry-Komponenten am Anfang der Datei
+import Masonry, { ResponsiveMasonry } from "react-responsive-masonry"
+
 interface GuidelineListProps {
   guidelines: Guideline[]
   principles: Principle[]
@@ -151,72 +154,109 @@ export default function GuidelineList({
           )}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredGuidelines.map((guideline) => (
-            <Card
-              key={guideline.id}
-              className="overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => openDetailDialog(guideline)}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">{guideline.title}</CardTitle>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {guideline.categories.map((category) => (
-                    <Badge key={category} variant="outline" className="text-xs">
-                      {category}
-                    </Badge>
-                  ))}
-                </div>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                {/* Bild vor dem Text anzeigen */}
-                <div className="mb-4 h-40 overflow-hidden rounded-md flex items-center justify-center">
-                  {guideline.svgContent ? (
-                    <div dangerouslySetInnerHTML={{ __html: guideline.svgContent }} className="w-full h-full" />
-                  ) : guideline.imageUrl ? (
-                    <img
-                      src={guideline.imageUrl || "/placeholder.svg"}
-                      alt={guideline.title}
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg?key=sdnoa"
-                      }}
-                    />
-                  ) : (
-                    <div className="text-gray-400 text-xs">Kein Bild verfügbar</div>
+        <ResponsiveMasonry columnsCountBreakPoints={{ 350: 1, 750: 2, 1100: 3, 1500: 4 }}>
+          <Masonry gutter="24px">
+            {filteredGuidelines.map((guideline) => {
+              // Bestimme die Größe der Karte basierend auf dem Inhalt
+              const hasImage = !!guideline.imageUrl || !!guideline.svgContent
+              const textLength = guideline.text.length
+              const categoriesCount = guideline.categories.length
+
+              // Berechne eine deterministische "Zufälligkeit" basierend auf der ID
+              const hash = guideline.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+              const randomFactor = hash % 3 // 0, 1, oder 2
+
+              // Bestimme die Größe basierend auf Inhalt und "Zufall"
+              let cardSize = "medium"
+              if ((textLength > 300 && hasImage) || randomFactor === 2) {
+                cardSize = "large"
+              } else if ((textLength < 100 && !hasImage) || randomFactor === 0) {
+                cardSize = "small"
+              }
+
+              // Bestimme die Bildhöhe basierend auf der Kartengröße
+              const imageHeight = cardSize === "small" ? "h-32" : cardSize === "large" ? "h-56" : "h-40"
+
+              // Bestimme die Textlänge basierend auf der Kartengröße
+              // const maxTextLength = cardSize === "small" ? 100 : cardSize === "large" ? 300 : 150
+              // const displayText =
+              //   guideline.text.length > maxTextLength
+              //     ? `${guideline.text.substring(0, maxTextLength)}...`
+              //     : guideline.text
+
+              return (
+                <Card
+                  key={guideline.id}
+                  className={`overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-shadow mb-6`}
+                  onClick={() => openDetailDialog(guideline)}
+                >
+                  <CardHeader className={`pb-2 ${cardSize === "small" ? "p-3" : cardSize === "large" ? "p-5" : "p-4"}`}>
+                    <CardTitle className={cardSize === "large" ? "text-xl" : "text-lg"}>{guideline.title}</CardTitle>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {guideline.categories.map((category) => (
+                        <Badge key={category} variant="outline" className="text-xs">
+                          {category}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardHeader>
+                  <CardContent
+                    className={`flex-grow ${cardSize === "small" ? "px-3 py-1" : cardSize === "large" ? "px-5 py-1" : "px-4 py-1"}`}
+                  >
+                    {/* Bild vor dem Text anzeigen mit variabler Höhe */}
+                    {(guideline.svgContent || guideline.imageUrl) && (
+                      <div
+                        className={`mb-4 ${imageHeight} overflow-hidden rounded-md flex items-center justify-center`}
+                      >
+                        {guideline.svgContent ? (
+                          <div dangerouslySetInnerHTML={{ __html: guideline.svgContent }} className="w-full h-full" />
+                        ) : guideline.imageUrl ? (
+                          <img
+                            src={guideline.imageUrl || "/placeholder.svg"}
+                            alt={guideline.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.svg?key=sdnoa"
+                            }}
+                          />
+                        ) : null}
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground">{guideline.text}</p>
+                  </CardContent>
+                  {isAuthenticated && (
+                    <CardFooter
+                      className={`pt-1 flex justify-end gap-2 ${cardSize === "small" ? "p-2" : cardSize === "large" ? "p-3" : "p-2"}`}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                        onClick={(e) => {
+                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
+                          onEdit(guideline)
+                        }}
+                      >
+                        <Pencil size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                        onClick={(e) => {
+                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
+                          handleDelete(guideline.id)
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </CardFooter>
                   )}
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-3">{guideline.text}</p>
-              </CardContent>
-              {isAuthenticated && (
-                <CardFooter className="pt-2 flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                      onEdit(guideline)
-                    }}
-                  >
-                    <Pencil size={14} className="mr-1" />
-                    Bearbeiten
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                      handleDelete(guideline.id)
-                    }}
-                  >
-                    <Trash2 size={14} className="mr-1" />
-                    Löschen
-                  </Button>
-                </CardFooter>
-              )}
-            </Card>
-          ))}
-        </div>
+                </Card>
+              )
+            })}
+          </Masonry>
+        </ResponsiveMasonry>
       ) : (
         <div className="space-y-4">
           {filteredGuidelines.map((guideline) => (

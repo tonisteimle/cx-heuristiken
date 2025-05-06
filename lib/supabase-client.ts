@@ -1,41 +1,58 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 // Singleton-Instanzen für Client und Server
-let browserClient: ReturnType<typeof createSupabaseClient> | null = null
+const browserClient: ReturnType<typeof createSupabaseClient> | null = null
 let serverClient: ReturnType<typeof createSupabaseClient> | null = null
 
 // Prüfen, ob wir im Browser oder auf dem Server sind
 const isBrowser = typeof window !== "undefined"
 
 // Client für den Browser erstellen (verwendet den anonymen Key)
+// Add better error handling to the Supabase client creation
+
 export function createClient() {
-  if (isBrowser) {
-    // Im Browser: Verwende den anonymen Key und speichere die Instanz
-    if (!browserClient) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.error("Supabase URL oder Anon Key fehlt")
-        throw new Error("Supabase URL oder Anon Key fehlt")
-      }
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Supabase URL or Anon Key is missing. Check your environment variables.")
 
-      console.log("Creating browser Supabase client with URL:", supabaseUrl)
-      browserClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-        },
-        global: {
-          fetch: fetch.bind(globalThis),
-        },
-      })
+    // Return a mock client that will gracefully fail
+    return {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: async () => ({ data: null, error: new Error("Supabase credentials are missing") }),
+          }),
+          limit: () => ({
+            maybeSingle: async () => ({ data: null, error: new Error("Supabase credentials are missing") }),
+          }),
+        }),
+        insert: async () => ({ error: new Error("Supabase credentials are missing") }),
+        upsert: async () => ({ error: new Error("Supabase credentials are missing") }),
+      }),
+      rpc: async () => ({ error: new Error("Supabase credentials are missing") }),
     }
+  }
 
-    return browserClient
-  } else {
-    // Auf dem Server: Verwende den Service Role Key
-    return createServerClient()
+  try {
+    return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+      global: {
+        fetch: (...args) => {
+          return fetch(...args).catch((err) => {
+            console.error("Fetch error in Supabase client:", err)
+            throw err
+          })
+        },
+      },
+    })
+  } catch (error) {
+    console.error("Error creating Supabase client:", error)
+    throw error
   }
 }
 

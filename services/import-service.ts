@@ -110,6 +110,7 @@ export class ImportService {
       normalized.principles = data.principles.map((principle: any) => {
         // Handle both name and title fields
         const title = principle.title || principle.name || ""
+        const name = principle.name || principle.title || ""
 
         // Handle element field
         let element: PrincipleElement = "other"
@@ -119,12 +120,23 @@ export class ImportService {
           element = principle.elements[0] as PrincipleElement
         }
 
+        // Preserve all fields from the original data
         return {
           id: principle.id || `principle-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           title: title,
+          name: name,
           description: principle.description || "",
           element: element,
+          elements: Array.isArray(principle.elements) ? principle.elements : [element],
           imageUrl: principle.imageUrl || undefined,
+          evidenz: principle.evidenz || undefined,
+          evidence: principle.evidence || principle.evidenz || undefined, // Map evidenz to evidence if needed
+          implikation: principle.implikation || undefined,
+          examples: principle.examples || undefined,
+          sources: Array.isArray(principle.sources) ? principle.sources : undefined,
+          relatedPrinciples: Array.isArray(principle.relatedPrinciples) ? principle.relatedPrinciples : undefined,
+          applications: principle.applications || undefined,
+          limitations: principle.limitations || undefined,
           createdAt: principle.createdAt || new Date().toISOString(),
           updatedAt: principle.updatedAt || new Date().toISOString(),
         }
@@ -139,6 +151,19 @@ export class ImportService {
     // Normalize elements
     if (Array.isArray(data.elements)) {
       normalized.elements = data.elements
+    } else {
+      // Extract unique elements from principles if not provided
+      const elementsSet = new Set<string>()
+      if (Array.isArray(data.principles)) {
+        data.principles.forEach((principle: any) => {
+          if (Array.isArray(principle.elements)) {
+            principle.elements.forEach((element: string) => elementsSet.add(element))
+          } else if (principle.element) {
+            elementsSet.add(principle.element)
+          }
+        })
+      }
+      normalized.elements = Array.from(elementsSet)
     }
 
     return normalized
@@ -210,9 +235,13 @@ export class ImportService {
       if (!principle.title && !principle.name) {
         console.warn(`Principle ${principle.id} has no title/name, setting empty title`)
         principle.title = ""
+        principle.name = ""
       } else if (!principle.title && principle.name) {
         // If name exists but title doesn't, copy name to title
         principle.title = principle.name
+      } else if (principle.title && !principle.name) {
+        // If title exists but name doesn't, copy title to name
+        principle.name = principle.title
       }
 
       if (!principle.description) {
