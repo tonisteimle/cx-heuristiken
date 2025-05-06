@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Pencil, Trash2, Search, X, LayoutGrid, List, BookOpen } from "lucide-react"
+import { Pencil, Trash2, Search, X, BookOpen, PlusCircle } from "lucide-react"
 import type { Guideline, Principle } from "@/types/guideline"
 import { PrincipleDetailDialog } from "./principle-detail-dialog"
 
@@ -135,18 +134,22 @@ export default function GuidelineList({
           </div>
 
           <div className="flex gap-2 ml-auto">
-            <ToggleGroup
-              type="single"
-              value={viewMode}
-              onValueChange={(value) => value && onViewModeChange(value as "grid" | "list")}
+            <Button
+              onClick={() =>
+                onEdit({
+                  id: `guideline-${Date.now()}`,
+                  title: "",
+                  text: "",
+                  categories: [],
+                  principles: [],
+                })
+              }
+              size="sm"
+              className="flex items-center gap-1"
             >
-              <ToggleGroupItem value="grid" size="sm" aria-label="Kachelansicht">
-                <LayoutGrid size={16} />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="list" size="sm" aria-label="Listenansicht">
-                <List size={16} />
-              </ToggleGroupItem>
-            </ToggleGroup>
+              <PlusCircle size={14} className="mr-1" />
+              Add
+            </Button>
           </div>
         </div>
       )}
@@ -244,7 +247,7 @@ export default function GuidelineList({
                       <div className="mt-3 pt-2 border-t">
                         <div className="flex items-center gap-1 mb-2">
                           <BookOpen size={14} className="text-muted-foreground" />
-                          <p className="text-xs font-medium text-muted-foreground">Psychologische Prinzipien:</p>
+                          <p className="text-xs font-medium text-muted-foreground">Psychologische Grundlagen:</p>
                         </div>
                         <div className="space-y-2">
                           {linkedPrinciples.map((principle) => (
@@ -354,7 +357,7 @@ export default function GuidelineList({
                       <div className="mt-3 pt-2 border-t">
                         <div className="flex items-center gap-1 mb-2">
                           <BookOpen size={14} className="text-muted-foreground" />
-                          <p className="text-xs font-medium text-muted-foreground">Psychologische Prinzipien:</p>
+                          <p className="text-xs font-medium text-muted-foreground">Psychologische Grundlagen:</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           {linkedPrinciples.map((principle) => (

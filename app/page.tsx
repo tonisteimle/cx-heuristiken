@@ -1,19 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  PlusCircle,
-  ArrowLeft,
-  AlertCircle,
-  RefreshCw,
-  BookOpen,
-  FileText,
-  Download,
-  Search,
-  X,
-  LayoutGrid,
-  List,
-} from "lucide-react"
+import { PlusCircle, ArrowLeft, AlertCircle, RefreshCw, BookOpen, FileText, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -26,11 +14,10 @@ import GuidelineList from "@/components/guideline-list"
 import PrincipleManager from "@/components/principle-manager"
 import type { Guideline, Principle, PrincipleElement } from "@/types/guideline"
 import { getStorageService } from "@/services/storage-factory"
-import { UnifiedImportDialogTrigger } from "@/components/unified-import-dialog-trigger"
 import { ExportOptionsDialog, type ExportOptions } from "@/components/export-options-dialog"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Input } from "@/components/ui/input"
 import { testSupabaseConnection, initializeDatabase } from "@/lib/supabase-client"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 function GuidelinesManager() {
   const { toast } = useToast()
@@ -66,6 +53,9 @@ function GuidelinesManager() {
   // Filterzustände für Principles
   const [searchTermPrinciples, setSearchTermPrinciples] = useState("")
   const [selectedElement, setSelectedElement] = useState<PrincipleElement>("all")
+
+  // Flag to hide the Add button temporarily
+  const showAddButton = false // Set to false to hide the button
 
   // Check Supabase connection on mount
   useEffect(() => {
@@ -310,7 +300,7 @@ function GuidelinesManager() {
             <div className="container mx-auto px-4">
               <div className="flex justify-between items-center py-4">
                 {/* Linker Bereich: Titel */}
-                <h1 className="text-2xl font-bold text-gray-700">CX Guidelines</h1>
+                <h1 className="text-2xl font-bold text-gray-700">Guidelines</h1>
 
                 {/* Mittlerer Bereich: Tabs */}
                 <div className="absolute left-1/2 transform -translate-x-1/2">
@@ -318,11 +308,11 @@ function GuidelinesManager() {
                     <TabsList>
                       <TabsTrigger value="guidelines">
                         <FileText size={14} className="mr-1" />
-                        CX Guidelines
+                        Guidelines
                       </TabsTrigger>
                       <TabsTrigger value="principles">
                         <BookOpen size={14} className="mr-1" />
-                        Psychologische Effekte
+                        Psychologische Grundlagen
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>
@@ -330,40 +320,43 @@ function GuidelinesManager() {
 
                 {/* Rechter Bereich: Aktionsbuttons */}
                 <div className="flex items-center gap-2">
-                  {/* Refresh Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleManualRefresh}
-                    disabled={isLoading}
-                    className="flex items-center gap-1"
-                  >
-                    <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-                    {isLoading ? "Refreshing..." : "Refresh"}
-                  </Button>
-
-                  {/* Import Button */}
-                  <UnifiedImportDialogTrigger />
-
-                  {/* Export Button */}
-                  <Button variant="outline" size="sm" onClick={openExportDialog} className="flex items-center gap-1">
-                    <Download size={14} />
-                    Export
-                  </Button>
-
-                  {/* Kontextabhängiger Hinzufügen-Button */}
-                  <Button onClick={handleAddButtonClick} size="sm" className="ml-2">
-                    <PlusCircle size={14} className="mr-1" />
-                    Add
-                  </Button>
+                  {/* ERGOSIGN Logo */}
+                  <img
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Bildschirmfoto%202025-05-06%20um%2015.33.11-UjNVhhdUL4pHyOYzVhUXHV7AMfqwcF.png"
+                    alt="ERGOSIGN"
+                    className="h-10"
+                  />
                 </div>
               </div>
             </div>
 
             {/* Pass the combined header height to child components */}
             {activeTab === "guidelines" && !state.isLoading && (
-              <div className="container mx-auto px-4 py-4">
+              <div className="container mx-auto px-4 pt-4 pb-0">
+                {/* Category dropdown above search */}
+                {/* Search input */}
                 <div className="flex flex-wrap items-center gap-4 mb-4">
+                  {/* Category dropdown */}
+                  <div className="w-[200px]">
+                    <Select
+                      value={selectedCategory || "all"}
+                      onValueChange={(value) => setSelectedCategory(value === "all" ? null : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Alle Kategorien" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle Kategorien</SelectItem>
+                        {state.categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Search input */}
                   <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -398,20 +391,15 @@ function GuidelinesManager() {
                     {(searchTermGuidelines || selectedCategory) && " (gefiltert)"}
                   </div>
 
-                  <div className="flex gap-2 ml-auto">
-                    <ToggleGroup
-                      type="single"
-                      value={guidelinesViewMode}
-                      onValueChange={(value) => value && setGuidelinesViewMode(value as "grid" | "list")}
-                    >
-                      <ToggleGroupItem value="grid" size="sm" aria-label="Kachelansicht">
-                        <LayoutGrid size={16} />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="list" size="sm" aria-label="Listenansicht">
-                        <List size={16} />
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
+                  {/* Add button - temporarily hidden */}
+                  {showAddButton && (
+                    <div className="flex gap-2 ml-auto">
+                      <Button onClick={handleAddButtonClick} size="sm" className="flex items-center gap-1">
+                        <PlusCircle size={14} className="mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -438,7 +426,7 @@ function GuidelinesManager() {
           {/* Hauptinhalt mit Abstand zum Header */}
           <div className="mt-[73px]">
             {activeTab === "guidelines" ? (
-              <div>
+              <div className="pt-6">
                 {state.isLoading ? (
                   <div className="text-center py-12">
                     <RefreshCw size={24} className="mx-auto animate-spin mb-4" />

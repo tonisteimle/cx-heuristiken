@@ -16,8 +16,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Pencil, Trash2, Search, X, LayoutGrid, List, ChevronDown } from "lucide-react"
+import { Pencil, Trash2, Search, X, ChevronDown, PlusCircle } from "lucide-react"
 import type { Principle, PrincipleElement } from "@/types/guideline"
 import { PrincipleDetailDialog } from "./principle-detail-dialog"
 
@@ -178,18 +177,10 @@ export default function PrincipleManager({
           </div>
 
           <div className="flex gap-2 ml-auto">
-            <ToggleGroup
-              type="single"
-              value={viewMode}
-              onValueChange={(value) => value && onViewModeChange(value as "grid" | "list")}
-            >
-              <ToggleGroupItem value="grid" size="sm" aria-label="Kachelansicht">
-                <LayoutGrid size={16} />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="list" size="sm" aria-label="Listenansicht">
-                <List size={16} />
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <Button onClick={() => onAddDialogOpenChange(true)} size="sm" className="flex items-center gap-1">
+              <PlusCircle size={14} className="mr-1" />
+              Add
+            </Button>
           </div>
         </div>
       )}
