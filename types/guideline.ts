@@ -32,4 +32,5 @@ export interface Guideline {
   detailSvgContent?: string
   createdAt?: string
   updatedAt?: string
+  justification?: string
 }

@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Pencil, Trash2, Search, X, LayoutGrid, List } from "lucide-react"
+import { Pencil, Trash2, Search, X, LayoutGrid, List, ChevronDown } from "lucide-react"
 import type { Principle, PrincipleElement } from "@/types/guideline"
 import { PrincipleDetailDialog } from "./principle-detail-dialog"
 
@@ -211,108 +211,127 @@ export default function PrincipleManager({
           )}
         </div>
       ) : viewMode === "grid" ? (
-        <ResponsiveMasonry columnsCountBreakPoints={{ 350: 1, 750: 2, 1100: 3, 1500: 4 }}>
-          <Masonry gutter="24px">
-            {filteredPrinciples.map((principle) => {
-              // Bestimme die Größe der Karte basierend auf dem Inhalt
-              const hasImage = !!principle.imageUrl
-              const textLength = principle.description.length
-              const hasEvidenz = !!(principle.evidenz || principle.evidence)
+        <div className="container mx-auto px-4">
+          <ResponsiveMasonry columnsCountBreakPoints={{ 350: 1, 750: 2, 1100: 3, 1500: 4 }}>
+            <Masonry gutter="24px">
+              {filteredPrinciples.map((principle) => {
+                // Bestimme die Größe der Karte basierend auf dem Inhalt
+                const hasImage = !!principle.imageUrl
+                const textLength = principle.description.length
+                const hasEvidenz = !!(principle.evidenz || principle.evidence)
 
-              // Berechne eine deterministische "Zufälligkeit" basierend auf der ID
-              const hash = principle.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-              const randomFactor = hash % 3 // 0, 1, oder 2
+                // Berechne eine deterministische "Zufälligkeit" basierend auf der ID
+                const hash = principle.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+                const randomFactor = hash % 3 // 0, 1, oder 2
 
-              // Bestimme die Größe basierend auf Inhalt und "Zufall"
-              let cardSize = "medium"
-              if ((textLength > 300 && (hasImage || hasEvidenz)) || randomFactor === 2) {
-                cardSize = "large"
-              } else if ((textLength < 100 && !hasImage) || randomFactor === 0) {
-                cardSize = "small"
-              }
+                // Bestimme die Größe basierend auf Inhalt und "Zufall"
+                let cardSize = "medium"
+                if ((textLength > 300 && (hasImage || hasEvidenz)) || randomFactor === 2) {
+                  cardSize = "large"
+                } else if ((textLength < 100 && !hasImage) || randomFactor === 0) {
+                  cardSize = "small"
+                }
 
-              // Bestimme die Bildhöhe basierend auf der Kartengröße
-              const imageHeight = cardSize === "small" ? "h-24" : cardSize === "large" ? "h-48" : "h-32"
+                // Bestimme die Bildhöhe basierend auf der Kartengröße
+                const imageHeight = cardSize === "small" ? "h-24" : cardSize === "large" ? "h-48" : "h-32"
 
-              return (
-                <Card
-                  key={principle.id}
-                  className={`overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-shadow mb-6`}
-                  onClick={() => openDetailDialog(principle)}
-                >
-                  <CardHeader className={`pb-2 ${cardSize === "small" ? "p-3" : cardSize === "large" ? "p-5" : "p-4"}`}>
-                    <CardTitle className={cardSize === "large" ? "text-xl" : "text-lg"}>
-                      {getPrincipleTitle(principle)}
-                    </CardTitle>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {(principle.elements || [principle.element]).filter(Boolean).map((element, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {element}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardHeader>
-                  <CardContent
-                    className={`flex-grow ${cardSize === "small" ? "p-3" : cardSize === "large" ? "p-5" : "p-4"}`}
+                return (
+                  <Card
+                    key={principle.id}
+                    className={`overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-shadow mb-6`}
+                    onClick={() => openDetailDialog(principle)}
                   >
-                    <p className="text-sm text-muted-foreground">{principle.description}</p>
-
-                    {/* Zeige Evidenz für große Karten an */}
-                    {cardSize === "large" && hasEvidenz && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Evidenz:</p>
-                        <p className="text-xs text-muted-foreground">{principle.evidenz || principle.evidence}</p>
-                      </div>
-                    )}
-
-                    {principle.imageUrl && (
-                      <div className={`mt-4 ${imageHeight} overflow-hidden rounded-md`}>
-                        <img
-                          src={principle.imageUrl || "/placeholder.svg"}
-                          alt={getPrincipleTitle(principle)}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = "/placeholder.svg?key=sdnoa"
-                          }}
-                        />
-                      </div>
-                    )}
-                  </CardContent>
-                  {isAuthenticated && (
-                    <div
-                      className={`p-2 pt-1 flex justify-end gap-2 ${cardSize === "small" ? "p-2" : cardSize === "large" ? "p-3" : "p-2"}`}
+                    <CardHeader
+                      className={`pb-2 ${cardSize === "small" ? "p-3" : cardSize === "large" ? "p-4" : "p-3"}`}
                     >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-gray-400 hover:text-gray-700"
-                        onClick={(e) => {
-                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                          setEditingPrinciple(principle)
-                        }}
+                      <CardTitle className={cardSize === "large" ? "text-xl" : "text-lg"}>
+                        {getPrincipleTitle(principle)}
+                      </CardTitle>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(principle.elements || [principle.element]).filter(Boolean).map((element, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {element}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardHeader>
+                    <CardContent
+                      className={`flex-grow ${cardSize === "small" ? "px-3 py-1" : cardSize === "large" ? "px-4 py-1" : "px-3 py-1"}`}
+                    >
+                      <p className="text-sm text-muted-foreground">{principle.description}</p>
+
+                      {/* Zeige Evidenz für Karten an, mit Begrenzung auf 3 Zeilen */}
+                      {hasEvidenz && (
+                        <div className="mt-3 pt-2 border-t">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Evidenz:</p>
+                          <p className="text-xs text-muted-foreground line-clamp-3">
+                            {principle.evidenz || principle.evidence}
+                          </p>
+                          {(principle.evidenz || principle.evidence || "").length > 150 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs mt-1 h-6 px-2 text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openDetailDialog(principle)
+                              }}
+                            >
+                              Mehr anzeigen <ChevronDown className="ml-1 h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {principle.imageUrl && (
+                        <div className={`mt-3 ${imageHeight} overflow-hidden rounded-md`}>
+                          <img
+                            src={principle.imageUrl || "/placeholder.svg"}
+                            alt={getPrincipleTitle(principle)}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.svg?key=sdnoa"
+                            }}
+                          />
+                        </div>
+                      )}
+                    </CardContent>
+                    {isAuthenticated && (
+                      <div
+                        className={`p-2 pt-1 flex justify-end gap-2 ${cardSize === "small" ? "p-2" : cardSize === "large" ? "p-3" : "p-2"}`}
                       >
-                        <Pencil size={16} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-gray-400 hover:text-gray-700"
-                        onClick={(e) => {
-                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                          handleDeletePrinciple(principle.id)
-                        }}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  )}
-                </Card>
-              )
-            })}
-          </Masonry>
-        </ResponsiveMasonry>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                          onClick={(e) => {
+                            e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
+                            setEditingPrinciple(principle)
+                          }}
+                        >
+                          <Pencil size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                          onClick={(e) => {
+                            e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
+                            handleDeletePrinciple(principle.id)
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
+            </Masonry>
+          </ResponsiveMasonry>
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className="container mx-auto px-4 space-y-4">
           {filteredPrinciples.map((principle) => (
             <Card
               key={principle.id}
@@ -359,6 +378,30 @@ export default function PrincipleManager({
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">{principle.description}</p>
+
+                {/* Zeige Evidenz mit Begrenzung auf 3 Zeilen */}
+                {(principle.evidenz || principle.evidence) && (
+                  <div className="mt-3 pt-2 border-t">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Evidenz:</p>
+                    <p className="text-xs text-muted-foreground line-clamp-3">
+                      {principle.evidenz || principle.evidence}
+                    </p>
+                    {(principle.evidenz || principle.evidence || "").length > 150 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs mt-1 h-6 px-2 text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openDetailDialog(principle)
+                        }}
+                      >
+                        Mehr anzeigen <ChevronDown className="ml-1 h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+
                 {principle.imageUrl && (
                   <div className="mt-4 h-32 overflow-hidden rounded-md">
                     <img

@@ -1,14 +1,16 @@
 "use client"
 import { useState } from "react"
+import type React from "react"
+
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Pencil, Trash2, Search, X, LayoutGrid, List } from "lucide-react"
+import { Pencil, Trash2, Search, X, LayoutGrid, List, BookOpen } from "lucide-react"
 import type { Guideline, Principle } from "@/types/guideline"
-import { GuidelineDetailDialog } from "./guideline-detail-dialog"
+import { PrincipleDetailDialog } from "./principle-detail-dialog"
 
 // Importiere die Masonry-Komponenten am Anfang der Datei
 import Masonry, { ResponsiveMasonry } from "react-responsive-masonry"
@@ -44,8 +46,8 @@ export default function GuidelineList({
   viewMode,
   onViewModeChange,
 }: GuidelineListProps) {
-  const [selectedGuideline, setSelectedGuideline] = useState<Guideline | null>(null)
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [selectedPrinciple, setSelectedPrinciple] = useState<Principle | null>(null)
+  const [principleDialogOpen, setPrincipleDialogOpen] = useState(false)
 
   // Extrahiere alle eindeutigen Kategorien aus den Guidelines
   const allCategories = Array.from(new Set(guidelines.flatMap((g) => g.categories || [])))
@@ -68,10 +70,22 @@ export default function GuidelineList({
     }
   }
 
-  // Funktion zum Öffnen des Detail-Dialogs
-  const openDetailDialog = (guideline: Guideline) => {
-    setSelectedGuideline(guideline)
-    setDetailDialogOpen(true)
+  // Funktion zum Abrufen der verknüpften Prinzipien für eine Guideline
+  const getLinkedPrinciples = (guideline: Guideline) => {
+    return principles.filter((principle) => guideline.principles.includes(principle.id))
+  }
+
+  // Funktion zum Öffnen des Prinzip-Detail-Dialogs
+  const openPrincipleDialog = (principle: Principle, e: React.MouseEvent) => {
+    e.stopPropagation() // Verhindert Event-Bubbling
+    setSelectedPrinciple(principle)
+    setPrincipleDialogOpen(true)
+  }
+
+  // Funktion zum Bearbeiten eines Prinzips (Dummy-Funktion, da wir keine Bearbeitung implementieren)
+  const handleEditPrinciple = (principle: Principle) => {
+    // Diese Funktion wird nicht implementiert, da wir keine Bearbeitung von Prinzipien aus dem Guideline-Kontext erlauben
+    setPrincipleDialogOpen(false)
   }
 
   return (
@@ -177,19 +191,11 @@ export default function GuidelineList({
               // Bestimme die Bildhöhe basierend auf der Kartengröße
               const imageHeight = cardSize === "small" ? "h-32" : cardSize === "large" ? "h-56" : "h-40"
 
-              // Bestimme die Textlänge basierend auf der Kartengröße
-              // const maxTextLength = cardSize === "small" ? 100 : cardSize === "large" ? 300 : 150
-              // const displayText =
-              //   guideline.text.length > maxTextLength
-              //     ? `${guideline.text.substring(0, maxTextLength)}...`
-              //     : guideline.text
+              // Hole die verknüpften Prinzipien
+              const linkedPrinciples = getLinkedPrinciples(guideline)
 
               return (
-                <Card
-                  key={guideline.id}
-                  className={`overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-shadow mb-6`}
-                  onClick={() => openDetailDialog(guideline)}
-                >
+                <Card key={guideline.id} className={`overflow-hidden flex flex-col mb-6`}>
                   <CardHeader className={`pb-2 ${cardSize === "small" ? "p-3" : cardSize === "large" ? "p-5" : "p-4"}`}>
                     <CardTitle className={cardSize === "large" ? "text-xl" : "text-lg"}>{guideline.title}</CardTitle>
                     <div className="flex flex-wrap gap-1 mt-2">
@@ -222,7 +228,38 @@ export default function GuidelineList({
                         ) : null}
                       </div>
                     )}
-                    <p className="text-sm text-muted-foreground">{guideline.text}</p>
+
+                    {/* Vollständiger Text ohne line-clamp */}
+                    <p className="text-sm text-muted-foreground mb-4">{guideline.text}</p>
+                    {/* Justification anzeigen, falls vorhanden */}
+                    {guideline.justification && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium mb-1">Begründung:</h4>
+                        <p className="text-sm text-muted-foreground">{guideline.justification}</p>
+                      </div>
+                    )}
+
+                    {/* Verknüpfte Prinzipien als Mini-Kacheln anzeigen */}
+                    {linkedPrinciples.length > 0 && (
+                      <div className="mt-3 pt-2 border-t">
+                        <div className="flex items-center gap-1 mb-2">
+                          <BookOpen size={14} className="text-muted-foreground" />
+                          <p className="text-xs font-medium text-muted-foreground">Psychologische Prinzipien:</p>
+                        </div>
+                        <div className="space-y-2">
+                          {linkedPrinciples.map((principle) => (
+                            <div
+                              key={principle.id}
+                              className="bg-gray-50 p-2 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+                              onClick={(e) => openPrincipleDialog(principle, e)}
+                            >
+                              <h4 className="text-sm font-medium">{principle.title || principle.name}</h4>
+                              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{principle.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                   {isAuthenticated && (
                     <CardFooter
@@ -232,10 +269,7 @@ export default function GuidelineList({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-gray-400 hover:text-gray-700"
-                        onClick={(e) => {
-                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                          onEdit(guideline)
-                        }}
+                        onClick={() => onEdit(guideline)}
                       >
                         <Pencil size={16} />
                       </Button>
@@ -243,10 +277,7 @@ export default function GuidelineList({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-gray-400 hover:text-gray-700"
-                        onClick={(e) => {
-                          e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                          handleDelete(guideline.id)
-                        }}
+                        onClick={() => handleDelete(guideline.id)}
                       >
                         <Trash2 size={16} />
                       </Button>
@@ -259,83 +290,100 @@ export default function GuidelineList({
         </ResponsiveMasonry>
       ) : (
         <div className="space-y-4">
-          {filteredGuidelines.map((guideline) => (
-            <Card
-              key={guideline.id}
-              className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => openDetailDialog(guideline)}
-            >
-              <div className="flex flex-col md:flex-row">
-                <div className="md:w-56 h-40 md:h-auto overflow-hidden flex items-center justify-center">
-                  {guideline.svgContent ? (
-                    <div dangerouslySetInnerHTML={{ __html: guideline.svgContent }} className="w-full h-full" />
-                  ) : guideline.imageUrl ? (
-                    <img
-                      src={guideline.imageUrl || "/placeholder.svg"}
-                      alt={guideline.title}
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg?key=sdnoa"
-                      }}
-                    />
-                  ) : (
-                    <div className="text-gray-400 text-xs">Kein Bild verfügbar</div>
-                  )}
-                </div>
-                <div className="flex-grow flex flex-col p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-semibold">{guideline.title}</h3>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {guideline.categories.map((category) => (
-                          <Badge key={category} variant="outline" className="text-xs">
-                            {category}
-                          </Badge>
-                        ))}
+          {filteredGuidelines.map((guideline) => {
+            // Hole die verknüpften Prinzipien
+            const linkedPrinciples = getLinkedPrinciples(guideline)
+
+            return (
+              <Card key={guideline.id} className="overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  <div className="md:w-56 h-40 md:h-auto overflow-hidden flex items-center justify-center">
+                    {guideline.svgContent ? (
+                      <div dangerouslySetInnerHTML={{ __html: guideline.svgContent }} className="w-full h-full" />
+                    ) : guideline.imageUrl ? (
+                      <img
+                        src={guideline.imageUrl || "/placeholder.svg"}
+                        alt={guideline.title}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder.svg?key=sdnoa"
+                        }}
+                      />
+                    ) : (
+                      <div className="text-gray-400 text-xs">Kein Bild verfügbar</div>
+                    )}
+                  </div>
+                  <div className="flex-grow flex flex-col p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-semibold">{guideline.title}</h3>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {guideline.categories.map((category) => (
+                            <Badge key={category} variant="outline" className="text-xs">
+                              {category}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
+                      {isAuthenticated && (
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => onEdit(guideline)}>
+                            <Pencil size={14} className="mr-1" />
+                            Bearbeiten
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleDelete(guideline.id)}>
+                            <Trash2 size={14} className="mr-1" />
+                            Löschen
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    {isAuthenticated && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                            onEdit(guideline)
-                          }}
-                        >
-                          <Pencil size={14} className="mr-1" />
-                          Bearbeiten
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation() // Verhindert, dass der Dialog geöffnet wird
-                            handleDelete(guideline.id)
-                          }}
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          Löschen
-                        </Button>
+
+                    {/* Vollständiger Text ohne line-clamp */}
+                    <p className="text-sm text-muted-foreground mt-2 mb-4">{guideline.text}</p>
+                    {/* Justification anzeigen, falls vorhanden */}
+                    {guideline.justification && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium mb-1">Begründung:</h4>
+                        <p className="text-sm text-muted-foreground">{guideline.justification}</p>
+                      </div>
+                    )}
+
+                    {/* Verknüpfte Prinzipien als Mini-Kacheln anzeigen */}
+                    {linkedPrinciples.length > 0 && (
+                      <div className="mt-3 pt-2 border-t">
+                        <div className="flex items-center gap-1 mb-2">
+                          <BookOpen size={14} className="text-muted-foreground" />
+                          <p className="text-xs font-medium text-muted-foreground">Psychologische Prinzipien:</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {linkedPrinciples.map((principle) => (
+                            <div
+                              key={principle.id}
+                              className="bg-gray-50 p-2 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+                              onClick={(e) => openPrincipleDialog(principle, e)}
+                            >
+                              <h4 className="text-sm font-medium">{principle.title || principle.name}</h4>
+                              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{principle.description}</p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{guideline.text}</p>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            )
+          })}
         </div>
       )}
 
-      {/* Detail-Dialog */}
-      <GuidelineDetailDialog
-        guideline={selectedGuideline}
-        principles={principles}
-        open={detailDialogOpen}
-        onOpenChange={setDetailDialogOpen}
-        onEdit={onEdit}
+      {/* Principle-Detail-Dialog */}
+      <PrincipleDetailDialog
+        principle={selectedPrinciple}
+        open={principleDialogOpen}
+        onOpenChange={setPrincipleDialogOpen}
+        onEdit={handleEditPrinciple}
       />
     </div>
   )
