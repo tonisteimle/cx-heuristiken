@@ -1,466 +1,519 @@
 import type { StorageData } from "@/types/storage-data"
+import type { Guideline, Principle, PrincipleElement } from "@/types/guideline"
 import { getStorageService } from "./storage-factory"
-import type { Guideline } from "@/types/guideline"
 
 export interface ImportOptions {
-  guidelines: boolean
-  principles: boolean
-  categories: boolean
-  replaceMode: boolean
+  mergeStrategy: "replace" | "merge" | "preserve"
+  importGuidelines: boolean
+  importPrinciples: boolean
+  importCategories: boolean
+  preserveImages: boolean
 }
 
-export interface ImportResult {
-  success: boolean
-  error?: string
-  message?: string
-  stats?: {
-    guidelines: number
-    principles: number
-    categories: number
-    svgCount?: number
-  }
-}
-
-export interface ImportProgress {
-  stage: string
-  progress: number
-  message?: string
-}
-
-/**
- * Service for handling all import operations
- */
 export class ImportService {
   /**
-   * Processes and saves data from a JSON string
-   * @param jsonString The JSON string to process
-   * @param options Import options
-   * @param onProgress Callback for progress updates
-   * @returns Import result
+   * Process and import data with various options
    */
-  static async processAndSaveData(
-    jsonString: string,
-    options: ImportOptions,
-    onProgress?: (progress: ImportProgress) => void,
-  ): Promise<ImportResult> {
+  public async importData(
+    importData: StorageData,
+    options: ImportOptions = {
+      mergeStrategy: "merge",
+      importGuidelines: true,
+      importPrinciples: true,
+      importCategories: true,
+      preserveImages: true,
+    },
+  ): Promise<{ success: boolean; message: string; stats?: ImportStats }> {
     try {
-      console.log("processAndSaveData: Starting import", { options })
+      console.log("Importing data:", JSON.stringify(importData).substring(0, 200) + "...")
 
-      // Report initial progress
-      if (onProgress) {
-        onProgress({ stage: "preparing", progress: 5, message: "Preparing import..." })
-      }
+      // Normalize the import data to match our expected structure
+      const normalizedData = this.normalizeImportData(importData)
+      console.log("Normalized data:", JSON.stringify(normalizedData).substring(0, 200) + "...")
 
-      // Parse the JSON string
-      let parsedData: any
-      try {
-        if (onProgress) {
-          onProgress({ stage: "parsing", progress: 10, message: "Parsing JSON data..." })
-        }
-        parsedData = JSON.parse(jsonString)
-        console.log("JSON parsed successfully")
-      } catch (parseError) {
-        console.error("Error parsing JSON data:", parseError)
+      // Validate the import data
+      const validationResult = this.validateImportData(normalizedData)
+      if (!validationResult.valid) {
         return {
           success: false,
-          error: `Error parsing JSON data: ${parseError instanceof Error ? parseError.message : "Unknown error"}`,
+          message: `Die importierten Daten haben ein ungültiges Format: ${validationResult.error}`,
         }
       }
 
-      // Basic validation of the parsed data
-      if (!parsedData || typeof parsedData !== "object") {
-        console.error("Invalid JSON data: not an object")
-        return { success: false, error: "The JSON data is empty or invalid." }
-      }
-
-      // Get the storage service
+      // Get current data from storage
       const storageService = getStorageService()
+      const currentData = await storageService.loadData()
+      console.log("Current data before import:", JSON.stringify(currentData).substring(0, 200) + "...")
 
-      // Load current data if not in replace mode
-      let currentData: StorageData | null = null
-      if (!options.replaceMode) {
-        try {
-          if (onProgress) {
-            onProgress({ stage: "loading-current", progress: 20, message: "Loading current data..." })
-          }
-          currentData = await storageService.loadData()
-          console.log("Current data loaded successfully")
-        } catch (loadError) {
-          console.error("Error loading current data:", loadError)
-          return {
-            success: false,
-            error: `Error loading current data: ${loadError instanceof Error ? loadError.message : "Unknown error"}`,
-          }
-        }
+      // Process data based on options
+      const processedData = await this.processImportData(currentData, normalizedData, options)
+      console.log("Processed data after import:", JSON.stringify(processedData).substring(0, 200) + "...")
+
+      // Save the processed data
+      const success = await storageService.saveData(processedData)
+
+      if (!success) {
+        return { success: false, message: "Fehler beim Speichern der importierten Daten." }
       }
 
-      // Zähle SVGs in den importierten Daten
-      let svgCount = 0
-      if (Array.isArray(parsedData.guidelines)) {
-        for (const guideline of parsedData.guidelines) {
-          if (guideline && guideline.svgContent) {
-            svgCount++
-            // Überprüfe, ob das SVG gültig ist
-            if (!guideline.svgContent.trim().startsWith("<svg") && !guideline.svgContent.trim().startsWith("<?xml")) {
-              console.warn(
-                `Ungültiges SVG-Format in Guideline ${guideline.id || "unknown"}: ${guideline.svgContent.substring(0, 50)}...`,
-              )
-            }
-          }
-        }
-      }
-      console.log(`Gefundene SVGs in importierten Daten: ${svgCount}`)
+      // Generate import statistics
+      const stats = this.generateImportStats(currentData, processedData, normalizedData)
 
-      // Prepare data for import
-      const importData: StorageData = {
-        guidelines: options.guidelines && Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
-        categories: options.categories && Array.isArray(parsedData.categories) ? parsedData.categories : [],
-        principles: options.principles && Array.isArray(parsedData.principles) ? parsedData.principles : [],
-        lastUpdated: new Date().toISOString(),
-        version: parsedData.version || "2.0",
-      }
-
-      console.log("Import data prepared", {
-        guidelinesCount: importData.guidelines.length,
-        categoriesCount: importData.categories.length,
-        principlesCount: importData.principles.length,
-        svgCount: svgCount,
-      })
-
-      // Process and save data
-      if (options.replaceMode) {
-        // Replace mode: save the imported data directly
-        if (onProgress) {
-          onProgress({ stage: "saving", progress: 50, message: "Saving imported data..." })
-        }
-
-        try {
-          // Direkt an die API senden, um Umgebungsvariablen-Probleme zu umgehen
-          const response = await fetch("/api/supabase/save-data", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              data: importData,
-              isIncremental: false,
-            }),
-          })
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            throw new Error(`API error: ${response.status} ${errorData.error || response.statusText}`)
-          }
-
-          const result = await response.json()
-          console.log("API response:", result)
-        } catch (saveError) {
-          console.error("Error saving imported data:", saveError)
-          return {
-            success: false,
-            error: `Error saving imported data: ${saveError instanceof Error ? saveError.message : "Unknown error"}`,
-          }
-        }
-      } else {
-        // Merge mode: merge with existing data
-        if (onProgress) {
-          onProgress({ stage: "merging", progress: 40, message: "Merging with existing data..." })
-        }
-
-        if (!currentData) {
-          console.error("Current data is null in merge mode")
-          return {
-            success: false,
-            error: "Failed to load current data for merging",
-          }
-        }
-
-        // Process guidelines
-        if (options.guidelines && importData.guidelines.length > 0) {
-          if (onProgress) {
-            onProgress({ stage: "processing-guidelines", progress: 50, message: "Processing guidelines..." })
-          }
-
-          let processedSvgCount = 0
-          let preservedSvgCount = 0
-
-          // Lade alle bestehenden Guidelines, um SVG-Inhalte zu erhalten
-          const existingGuidelines: Record<string, Guideline> = {}
-          if (currentData && Array.isArray(currentData.guidelines)) {
-            for (const guideline of currentData.guidelines) {
-              if (guideline && guideline.id) {
-                existingGuidelines[guideline.id] = guideline
-              }
-            }
-          }
-
-          console.log(`Gefundene bestehende Guidelines: ${Object.keys(existingGuidelines).length}`)
-
-          for (let i = 0; i < importData.guidelines.length; i++) {
-            const guideline = importData.guidelines[i]
-
-            try {
-              // Prüfe, ob eine bestehende Guideline mit dieser ID existiert
-              const existingGuideline = guideline.id ? existingGuidelines[guideline.id] : null
-
-              // Ensure guideline has required fields
-              const processedGuideline: Guideline = {
-                id: guideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                title: guideline.title || "Untitled",
-                text: guideline.text || "",
-                categories: Array.isArray(guideline.categories) ? guideline.categories : [],
-                principles: Array.isArray(guideline.principles) ? guideline.principles : [],
-                createdAt: guideline.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                // SVG-Inhalte mit Priorität behandeln:
-                // 1. Wenn die importierte Guideline SVG-Inhalte hat, verwende diese
-                // 2. Wenn nicht und eine bestehende Guideline existiert, behalte deren SVG-Inhalte
-                // 3. Ansonsten keine SVG-Inhalte
-                ...(guideline.svgContent
-                  ? { svgContent: guideline.svgContent }
-                  : existingGuideline?.svgContent
-                    ? { svgContent: existingGuideline.svgContent }
-                    : {}),
-
-                ...(guideline.detailSvgContent
-                  ? { detailSvgContent: guideline.detailSvgContent }
-                  : existingGuideline?.detailSvgContent
-                    ? { detailSvgContent: existingGuideline.detailSvgContent }
-                    : {}),
-
-                // Ähnlich für imageUrl und justification
-                ...(guideline.imageUrl
-                  ? { imageUrl: guideline.imageUrl }
-                  : existingGuideline?.imageUrl
-                    ? { imageUrl: existingGuideline.imageUrl }
-                    : {}),
-
-                ...(guideline.justification
-                  ? { justification: guideline.justification }
-                  : existingGuideline?.justification
-                    ? { justification: existingGuideline.justification }
-                    : {}),
-              }
-
-              // Zähle SVGs
-              if (processedGuideline.svgContent) {
-                if (guideline.svgContent) {
-                  processedSvgCount++
-                  console.log(
-                    `Guideline ${i + 1} hat neuen SVG-Inhalt: ${processedGuideline.svgContent.substring(0, 50)}...`,
-                  )
-                } else if (existingGuideline?.svgContent) {
-                  preservedSvgCount++
-                  console.log(
-                    `Guideline ${i + 1} behält bestehenden SVG-Inhalt: ${processedGuideline.svgContent.substring(0, 50)}...`,
-                  )
-                }
-              }
-
-              // Save guideline via API
-              try {
-                const response = await fetch("/api/supabase/save-guideline", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify(processedGuideline),
-                })
-
-                if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({}))
-                  throw new Error(`API error: ${response.status} ${errorData.error || response.statusText}`)
-                }
-
-                const result = await response.json()
-                console.log(`Guideline ${i + 1}/${importData.guidelines.length} saved:`, result)
-              } catch (apiError) {
-                console.error(`Error saving guideline ${i + 1} via API:`, apiError)
-                throw apiError
-              }
-            } catch (error) {
-              console.error(`Error processing guideline at index ${i}:`, error)
-            }
-
-            // Update progress
-            if (onProgress) {
-              onProgress({
-                stage: "saving-guidelines",
-                progress: 50 + (i / importData.guidelines.length) * 20,
-                message: `Saving guideline ${i + 1}/${importData.guidelines.length}`,
-              })
-            }
-          }
-
-          console.log(`Verarbeitete SVGs: ${processedSvgCount} von ${importData.guidelines.length} Guidelines`)
-          console.log(`Beibehaltene SVGs: ${preservedSvgCount} von ${importData.guidelines.length} Guidelines`)
-        }
-
-        // Process principles and categories via API
-        if (
-          (options.principles && importData.principles.length > 0) ||
-          (options.categories && importData.categories.length > 0)
-        ) {
-          if (onProgress) {
-            onProgress({
-              stage: "processing-principles-categories",
-              progress: 80,
-              message: "Processing principles and categories...",
-            })
-          }
-
-          // Prepare data for API
-          const apiData: Partial<StorageData> = {
-            principles: options.principles ? importData.principles : [],
-            categories: options.categories ? importData.categories : [],
-            guidelines: [], // No guidelines here, we processed them individually
-            lastUpdated: new Date().toISOString(),
-            version: "2.0",
-          }
-
-          try {
-            const response = await fetch("/api/supabase/save-data", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                data: apiData,
-                isIncremental: true, // Use incremental mode to merge with existing data
-              }),
-            })
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}))
-              throw new Error(`API error: ${response.status} ${errorData.error || response.statusText}`)
-            }
-
-            const result = await response.json()
-            console.log("Principles and categories saved:", result)
-          } catch (apiError) {
-            console.error("Error saving principles and categories:", apiError)
-          }
-        }
-      }
-
-      // Report completion
-      if (onProgress) {
-        onProgress({ stage: "completed", progress: 100, message: "Import completed" })
-      }
-
-      console.log("Import completed successfully")
       return {
         success: true,
-        message: "Import completed successfully",
-        stats: {
-          guidelines: importData.guidelines.length,
-          principles: importData.principles.length,
-          categories: importData.categories.length,
-          svgCount: svgCount,
-        },
+        message: "Daten erfolgreich importiert.",
+        stats,
       }
     } catch (error) {
-      console.error("Error in processAndSaveData:", error)
+      console.error("Import error:", error)
       return {
         success: false,
-        error: `Import failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        message: `Fehler beim Importieren der Daten: ${error instanceof Error ? error.message : String(error)}`,
       }
     }
   }
 
   /**
-   * Validates JSON data for import
-   * @param jsonText The JSON text to validate
-   * @param onProgress Optional callback for progress updates
-   * @returns Validation result with parsed data if successful
+   * Normalize the import data to match our expected structure
    */
-  static async validateJsonData(
-    jsonText: string,
-    onProgress?: (progress: ImportProgress) => void,
-  ): Promise<{ valid: boolean; data?: StorageData; error?: string }> {
-    try {
-      console.log("validateJsonData: Starting validation")
-      if (!jsonText || jsonText.trim() === "") {
-        console.warn("validateJsonData: Empty JSON data")
-        return { valid: false, error: "Empty JSON data" }
-      }
+  private normalizeImportData(data: any): StorageData {
+    const normalized: StorageData = {
+      guidelines: [],
+      principles: [],
+      categories: [],
+      elements: [],
+      lastUpdated: new Date().toISOString(),
+      version: data.version || "2.0",
+    }
 
-      // Report progress
-      if (onProgress) {
-        onProgress({ stage: "parsing", progress: 30 })
-      }
-
-      // Try to parse the JSON
-      let parsedData: Partial<StorageData>
-      try {
-        parsedData = JSON.parse(jsonText)
-      } catch (err) {
-        console.error("validateJsonData: JSON parsing error", err)
+    // Normalize guidelines
+    if (Array.isArray(data.guidelines)) {
+      normalized.guidelines = data.guidelines.map((guideline: any) => {
         return {
-          valid: false,
-          error: `Invalid JSON format: ${err instanceof Error ? err.message : "Unknown error"}`,
+          id: guideline.id || `guideline-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          title: guideline.title || "",
+          text: guideline.text || "",
+          categories: Array.isArray(guideline.categories) ? guideline.categories : [],
+          principles: Array.isArray(guideline.principles) ? guideline.principles : [],
+          imageUrl: guideline.imageUrl || undefined,
+          detailImageUrl: guideline.detailImageUrl || undefined,
+          svgContent: guideline.svgContent || undefined,
+          detailSvgContent: guideline.detailSvgContent || undefined,
+          createdAt: guideline.createdAt || new Date().toISOString(),
+          updatedAt: guideline.updatedAt || new Date().toISOString(),
         }
-      }
-
-      // Report progress
-      if (onProgress) {
-        onProgress({ stage: "validating content", progress: 60 })
-      }
-
-      // Basic structure validation
-      if (!parsedData || typeof parsedData !== "object") {
-        console.warn("validateJsonData: Parsed data is not an object")
-        return { valid: false, error: "The JSON data is empty or invalid." }
-      }
-
-      // Ensure the basic structure is present
-      const validData: StorageData = {
-        guidelines: Array.isArray(parsedData.guidelines) ? parsedData.guidelines : [],
-        categories: Array.isArray(parsedData.categories) ? parsedData.categories : [],
-        principles: Array.isArray(parsedData.principles) ? parsedData.principles : [],
-        lastUpdated: parsedData.lastUpdated || new Date().toISOString(),
-        version: parsedData.version || "2.0",
-      }
-
-      // Zähle SVGs in den validierten Daten
-      let svgCount = 0
-      if (Array.isArray(validData.guidelines)) {
-        for (const guideline of validData.guidelines) {
-          if (guideline && guideline.svgContent) {
-            svgCount++
-          }
-        }
-      }
-      console.log(`Gefundene SVGs in validierten Daten: ${svgCount}`)
-
-      // Check if at least one of the arrays contains data
-      if (validData.guidelines.length === 0 && validData.categories.length === 0 && validData.principles.length === 0) {
-        console.warn("validateJsonData: No importable data found")
-        return {
-          valid: false,
-          error: "The JSON contains no importable data (no guidelines, categories, or principles).",
-        }
-      }
-
-      // Report progress
-      if (onProgress) {
-        onProgress({ stage: "validated", progress: 100 })
-      }
-
-      console.log("validateJsonData: Validation successful", {
-        guidelinesCount: validData.guidelines.length,
-        categoriesCount: validData.categories.length,
-        principlesCount: validData.principles.length,
-        svgCount: svgCount,
       })
+    }
 
-      return { valid: true, data: validData }
-    } catch (error) {
-      console.error("Error validating JSON data:", error)
-      return {
-        valid: false,
-        error: `Error validating JSON data: ${error instanceof Error ? error.message : "Unknown error"}`,
+    // Normalize principles
+    if (Array.isArray(data.principles)) {
+      normalized.principles = data.principles.map((principle: any) => {
+        // Handle both name and title fields
+        const title = principle.title || principle.name || ""
+
+        // Handle element field
+        let element: PrincipleElement = "other"
+        if (principle.element) {
+          element = principle.element as PrincipleElement
+        } else if (Array.isArray(principle.elements) && principle.elements.length > 0) {
+          element = principle.elements[0] as PrincipleElement
+        }
+
+        return {
+          id: principle.id || `principle-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          title: title,
+          description: principle.description || "",
+          element: element,
+          imageUrl: principle.imageUrl || undefined,
+          createdAt: principle.createdAt || new Date().toISOString(),
+          updatedAt: principle.updatedAt || new Date().toISOString(),
+        }
+      })
+    }
+
+    // Normalize categories
+    if (Array.isArray(data.categories)) {
+      normalized.categories = data.categories
+    }
+
+    // Normalize elements
+    if (Array.isArray(data.elements)) {
+      normalized.elements = data.elements
+    }
+
+    return normalized
+  }
+
+  /**
+   * Validate the structure of the import data
+   */
+  private validateImportData(data: any): { valid: boolean; error?: string } {
+    if (!data || typeof data !== "object") {
+      return { valid: false, error: "Daten sind kein gültiges Objekt" }
+    }
+
+    // Check if guidelines array exists if we need it
+    if (!Array.isArray(data.guidelines)) {
+      console.warn("Guidelines is not an array or missing")
+      // Make it an empty array to avoid errors
+      data.guidelines = []
+    }
+
+    // Check if principles array exists if we need it
+    if (!Array.isArray(data.principles)) {
+      console.warn("Principles is not an array or missing")
+      // Make it an empty array to avoid errors
+      data.principles = []
+    }
+
+    // Check if categories array exists if we need it
+    if (!Array.isArray(data.categories)) {
+      console.warn("Categories is not an array or missing")
+      // Make it an empty array to avoid errors
+      data.categories = []
+    }
+
+    // Validate guidelines structure with more flexibility
+    for (const guideline of data.guidelines) {
+      if (!guideline.id) {
+        return { valid: false, error: "Eine Guideline hat keine ID" }
+      }
+
+      if (!guideline.title) {
+        console.warn(`Guideline ${guideline.id} has no title, setting empty title`)
+        guideline.title = ""
+      }
+
+      if (!guideline.text) {
+        console.warn(`Guideline ${guideline.id} has no text, setting empty text`)
+        guideline.text = ""
+      }
+
+      if (!Array.isArray(guideline.categories)) {
+        console.warn(`Guideline ${guideline.id} has no categories array, creating empty array`)
+        guideline.categories = []
+      }
+
+      if (!Array.isArray(guideline.principles)) {
+        console.warn(`Guideline ${guideline.id} has no principles array, creating empty array`)
+        guideline.principles = []
       }
     }
+
+    // Validate principles structure with more flexibility
+    for (const principle of data.principles) {
+      if (!principle.id) {
+        return { valid: false, error: "Ein Principle hat keine ID" }
+      }
+
+      // Handle both name and title fields for principles
+      if (!principle.title && !principle.name) {
+        console.warn(`Principle ${principle.id} has no title/name, setting empty title`)
+        principle.title = ""
+      } else if (!principle.title && principle.name) {
+        // If name exists but title doesn't, copy name to title
+        principle.title = principle.name
+      }
+
+      if (!principle.description) {
+        console.warn(`Principle ${principle.id} has no description, setting empty description`)
+        principle.description = ""
+      }
+
+      // Handle element vs elements field
+      if (!principle.element && Array.isArray(principle.elements) && principle.elements.length > 0) {
+        // If elements array exists but element doesn't, use the first element
+        principle.element = principle.elements[0]
+      } else if (!principle.element) {
+        // Default to "other" if no element is specified
+        principle.element = "other"
+      }
+
+      // Ensure elements array exists
+      if (!Array.isArray(principle.elements)) {
+        principle.elements = [principle.element]
+      }
+    }
+
+    return { valid: true }
   }
+
+  /**
+   * Process the import data based on options
+   */
+  private async processImportData(
+    currentData: StorageData,
+    importData: StorageData,
+    options: ImportOptions,
+  ): Promise<StorageData> {
+    const result: StorageData = {
+      guidelines: [...currentData.guidelines],
+      principles: [...currentData.principles],
+      categories: [...currentData.categories],
+      elements: [...(currentData.elements || [])],
+      version: currentData.version,
+      lastUpdated: new Date().toISOString(),
+    }
+
+    // Process guidelines if enabled
+    if (options.importGuidelines) {
+      result.guidelines = this.processGuidelines(currentData.guidelines, importData.guidelines, options)
+    }
+
+    // Process principles if enabled
+    if (options.importPrinciples) {
+      result.principles = this.processPrinciples(currentData.principles, importData.principles, options)
+    }
+
+    // Process categories if enabled
+    if (options.importCategories) {
+      result.categories = this.processCategories(currentData.categories, importData.categories, options)
+    }
+
+    // Process elements if available
+    if (importData.elements && importData.elements.length > 0) {
+      result.elements = this.processElements(currentData.elements || [], importData.elements, options)
+    }
+
+    return result
+  }
+
+  /**
+   * Process guidelines based on import options
+   */
+  private processGuidelines(
+    currentGuidelines: Guideline[],
+    importGuidelines: Guideline[],
+    options: ImportOptions,
+  ): Guideline[] {
+    // Create a map of imported guidelines for faster lookup
+    const importedGuidelineMap = new Map<string, Guideline>()
+    importGuidelines.forEach((guideline) => {
+      importedGuidelineMap.set(guideline.id, guideline)
+    })
+
+    // Start with all current guidelines
+    const result: Guideline[] = [...currentGuidelines]
+    const existingIds = new Set(currentGuidelines.map((g) => g.id))
+
+    // Process each imported guideline
+    importGuidelines.forEach((importedGuideline) => {
+      if (existingIds.has(importedGuideline.id)) {
+        // Update existing guideline if strategy is merge or replace
+        if (options.mergeStrategy === "merge" || options.mergeStrategy === "replace") {
+          const existingGuideline = currentGuidelines.find((g) => g.id === importedGuideline.id)!
+          const mergedGuideline = this.mergeGuideline(existingGuideline, importedGuideline, options)
+
+          // Replace the existing guideline with the merged one
+          const index = result.findIndex((g) => g.id === existingGuideline.id)
+          if (index !== -1) {
+            result[index] = mergedGuideline
+          }
+        }
+        // If strategy is 'preserve', we keep the existing guideline
+      } else {
+        // Add new guideline
+        result.push(importedGuideline)
+      }
+    })
+
+    return result
+  }
+
+  /**
+   * Merge a guideline with an imported one, preserving images if needed
+   */
+  private mergeGuideline(
+    existingGuideline: Guideline,
+    importedGuideline: Guideline,
+    options: ImportOptions,
+  ): Guideline {
+    const result = { ...importedGuideline }
+
+    // Preserve images if option is enabled and imported guideline lacks images
+    if (options.preserveImages) {
+      // Preserve SVG content if existing has it but imported doesn't
+      if (existingGuideline.svgContent && !importedGuideline.svgContent) {
+        result.svgContent = existingGuideline.svgContent
+      }
+
+      // Preserve detail SVG content if existing has it but imported doesn't
+      if (existingGuideline.detailSvgContent && !importedGuideline.detailSvgContent) {
+        result.detailSvgContent = existingGuideline.detailSvgContent
+      }
+
+      // Preserve image URL if existing has it but imported doesn't
+      if (existingGuideline.imageUrl && !importedGuideline.imageUrl) {
+        result.imageUrl = existingGuideline.imageUrl
+      }
+
+      // Preserve detail image URL if existing has it but imported doesn't
+      if (existingGuideline.detailImageUrl && !importedGuideline.detailImageUrl) {
+        result.detailImageUrl = existingGuideline.detailImageUrl
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Process principles based on import options
+   */
+  private processPrinciples(
+    currentPrinciples: Principle[],
+    importPrinciples: Principle[],
+    options: ImportOptions,
+  ): Principle[] {
+    // Create a map of imported principles for faster lookup
+    const importedPrincipleMap = new Map<string, Principle>()
+    importPrinciples.forEach((principle) => {
+      importedPrincipleMap.set(principle.id, principle)
+    })
+
+    // Start with all current principles
+    const result: Principle[] = [...currentPrinciples]
+    const existingIds = new Set(currentPrinciples.map((p) => p.id))
+
+    // Process each imported principle
+    importPrinciples.forEach((importedPrinciple) => {
+      if (existingIds.has(importedPrinciple.id)) {
+        // Update existing principle if strategy is merge or replace
+        if (options.mergeStrategy === "merge" || options.mergeStrategy === "replace") {
+          const existingPrinciple = currentPrinciples.find((p) => p.id === importedPrinciple.id)!
+          const mergedPrinciple = this.mergePrinciple(existingPrinciple, importedPrinciple, options)
+
+          // Replace the existing principle with the merged one
+          const index = result.findIndex((p) => p.id === existingPrinciple.id)
+          if (index !== -1) {
+            result[index] = mergedPrinciple
+          }
+        }
+        // If strategy is 'preserve', we keep the existing principle
+      } else {
+        // Add new principle
+        result.push(importedPrinciple)
+      }
+    })
+
+    return result
+  }
+
+  /**
+   * Merge a principle with an imported one, preserving images if needed
+   */
+  private mergePrinciple(
+    existingPrinciple: Principle,
+    importedPrinciple: Principle,
+    options: ImportOptions,
+  ): Principle {
+    const result = { ...importedPrinciple }
+
+    // Preserve images if option is enabled and imported principle lacks images
+    if (options.preserveImages) {
+      // Preserve image URL if existing has it but imported doesn't
+      if (existingPrinciple.imageUrl && !importedPrinciple.imageUrl) {
+        result.imageUrl = existingPrinciple.imageUrl
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Process categories based on import options
+   */
+  private processCategories(currentCategories: string[], importCategories: string[], options: ImportOptions): string[] {
+    if (options.mergeStrategy === "replace") {
+      return importCategories
+    }
+
+    // For merge strategy, combine categories and remove duplicates
+    const combinedCategories = [...currentCategories, ...importCategories]
+    return [...new Set(combinedCategories)]
+  }
+
+  /**
+   * Process elements based on import options
+   */
+  private processElements(currentElements: string[], importElements: string[], options: ImportOptions): string[] {
+    if (options.mergeStrategy === "replace") {
+      return importElements
+    }
+
+    // For merge strategy, combine elements and remove duplicates
+    const combinedElements = [...currentElements, ...importElements]
+    return [...new Set(combinedElements)]
+  }
+
+  /**
+   * Generate statistics about the import operation
+   */
+  private generateImportStats(
+    originalData: StorageData,
+    resultData: StorageData,
+    importData: StorageData,
+  ): ImportStats {
+    return {
+      guidelinesTotal: resultData.guidelines.length,
+      guidelinesAdded: resultData.guidelines.length - originalData.guidelines.length,
+      guidelinesUpdated: this.countUpdatedItems(originalData.guidelines, resultData.guidelines, importData.guidelines),
+
+      principlesTotal: resultData.principles.length,
+      principlesAdded: resultData.principles.length - originalData.principles.length,
+      principlesUpdated: this.countUpdatedItems(originalData.principles, resultData.principles, importData.principles),
+
+      categoriesTotal: resultData.categories.length,
+      categoriesAdded: resultData.categories.length - originalData.categories.length,
+
+      elementsTotal: (resultData.elements || []).length,
+      elementsAdded: (resultData.elements || []).length - (originalData.elements || []).length,
+    }
+  }
+
+  /**
+   * Count how many items were updated during import
+   */
+  private countUpdatedItems<T extends { id: string }>(
+    originalItems: T[],
+    resultItems: T[],
+    importedItems: T[],
+  ): number {
+    let count = 0
+
+    // Create maps for faster lookup
+    const originalMap = new Map<string, T>()
+    originalItems.forEach((item) => originalMap.set(item.id, item))
+
+    const resultMap = new Map<string, T>()
+    resultItems.forEach((item) => resultMap.set(item.id, item))
+
+    // Check each imported item
+    importedItems.forEach((importedItem) => {
+      const originalItem = originalMap.get(importedItem.id)
+      const resultItem = resultMap.get(importedItem.id)
+
+      // If item existed before, exists now, and is different from original, it was updated
+      if (originalItem && resultItem && JSON.stringify(originalItem) !== JSON.stringify(resultItem)) {
+        count++
+      }
+    })
+
+    return count
+  }
+}
+
+export interface ImportStats {
+  guidelinesTotal: number
+  guidelinesAdded: number
+  guidelinesUpdated: number
+
+  principlesTotal: number
+  principlesAdded: number
+  principlesUpdated: number
+
+  categoriesTotal: number
+  categoriesAdded: number
+
+  elementsTotal: number
+  elementsAdded: number
 }

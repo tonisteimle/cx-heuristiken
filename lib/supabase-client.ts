@@ -1,61 +1,142 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
-// Singleton-Instanz für den Server-Client
-let serverClientInstance: ReturnType<typeof createClient> | null = null
+// Singleton-Instanzen für Client und Server
+let browserClient: ReturnType<typeof createSupabaseClient> | null = null
+let serverClient: ReturnType<typeof createSupabaseClient> | null = null
 
-// Singleton-Instanz für den Browser-Client
-let browserClientInstance: ReturnType<typeof createClient> | null = null
+// Prüfen, ob wir im Browser oder auf dem Server sind
+const isBrowser = typeof window !== "undefined"
 
-// Erstellt einen Supabase-Client für serverseitige Operationen
-export function createServerSupabaseClient() {
-  if (serverClientInstance) return serverClientInstance
+// Client für den Browser erstellen (verwendet den anonymen Key)
+export function createClient() {
+  if (isBrowser) {
+    // Im Browser: Verwende den anonymen Key und speichere die Instanz
+    if (!browserClient) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error("Supabase URL oder Anon Key fehlt")
+        throw new Error("Supabase URL oder Anon Key fehlt")
+      }
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase URL oder Service Role Key nicht gefunden")
-  }
+      console.log("Creating browser Supabase client with URL:", supabaseUrl)
+      browserClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+        global: {
+          fetch: fetch.bind(globalThis),
+        },
+      })
+    }
 
-  serverClientInstance = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-    },
-  })
-
-  return serverClientInstance
-}
-
-// Erstellt einen Supabase-Client für clientseitige Operationen
-export function createBrowserSupabaseClient() {
-  if (typeof window === "undefined") {
-    throw new Error("createBrowserSupabaseClient sollte nur im Browser aufgerufen werden")
-  }
-
-  if (browserClientInstance) return browserClientInstance
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase URL oder Anon Key nicht gefunden")
-  }
-
-  browserClientInstance = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      storageKey: "guidelines-manager-auth",
-    },
-  })
-
-  return browserClientInstance
-}
-
-// Hilfsfunktion, um den richtigen Client basierend auf der Umgebung zu erhalten
-export function getSupabaseClient() {
-  if (typeof window === "undefined") {
-    return createServerSupabaseClient()
+    return browserClient
   } else {
-    return createBrowserSupabaseClient()
+    // Auf dem Server: Verwende den Service Role Key
+    return createServerClient()
+  }
+}
+
+// Client für den Server erstellen (verwendet den Service Role Key)
+export function createServerClient() {
+  if (isBrowser) {
+    throw new Error("createServerClient sollte nicht im Browser aufgerufen werden")
+  }
+
+  if (!serverClient) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Supabase URL oder Service Role Key fehlt")
+      throw new Error("Supabase URL oder Service Role Key fehlt")
+    }
+
+    console.log("Creating server Supabase client with URL:", supabaseUrl)
+    serverClient = createSupabaseClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      global: {
+        fetch: fetch.bind(globalThis),
+      },
+    })
+  }
+
+  return serverClient
+}
+
+// Replace the testSupabaseConnection function with this version that doesn't use aggregate functions
+export async function testSupabaseConnection() {
+  try {
+    const supabase = createClient()
+    // Use a simple SELECT query instead of COUNT()
+    const { data, error } = await supabase.from("guidelines_data").select("id").limit(1)
+
+    if (error) {
+      console.error("Supabase connection test failed:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Unexpected error during Supabase connection test:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+    }
+  }
+}
+
+// Function to initialize the database if needed
+export async function initializeDatabase() {
+  try {
+    const supabase = createClient()
+
+    // Check if the table exists
+    const { error: checkError } = await supabase.from("guidelines_data").select("id").limit(1)
+
+    if (checkError && checkError.message.includes("does not exist")) {
+      // Table doesn't exist, create it
+      const { error: createError } = await supabase.rpc("create_guidelines_table")
+
+      if (createError) {
+        console.error("Failed to create table via RPC:", createError)
+
+        // Try direct SQL as fallback (this might not work in all environments)
+        try {
+          const { error: sqlError } = await supabase.from("guidelines_data").insert({
+            id: "app_data",
+            data: {
+              principles: [],
+              guidelines: [],
+              categories: [],
+              elements: [],
+            },
+            updated_at: new Date().toISOString(),
+          })
+
+          if (sqlError && !sqlError.message.includes("already exists")) {
+            return { success: false, error: sqlError }
+          }
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error : new Error(String(error)),
+          }
+        }
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to initialize database:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+    }
   }
 }

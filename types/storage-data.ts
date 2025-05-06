@@ -1,3 +1,14 @@
+import type { Guideline, Principle } from "./guideline"
+
+export interface StorageData {
+  principles: Principle[]
+  guidelines: Guideline[]
+  categories: string[]
+  elements: string[]
+  lastUpdated?: string
+  version?: string
+}
+
 export interface StorageStats {
   imagesCount: number
   totalSize: number
@@ -6,12 +17,4 @@ export interface StorageStats {
   categoriesCount: number
   principlesCount: number
   databaseSize: number
-}
-
-export interface StorageData {
-  guidelines: any[] // Replace 'any' with the actual type if available
-  categories: any[] // Replace 'any' with the actual type if available
-  principles: any[] // Replace 'any' with the actual type if available
-  lastUpdated: string
-  version: string
 }

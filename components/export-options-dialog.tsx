@@ -1,22 +1,23 @@
 "use client"
 
 import { useState } from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/use-toast"
-import { Download } from "lucide-react"
-// Importiere die Typografie-Komponenten
-import { DialogTitleText, DialogDescriptionText, SmallText } from "@/components/ui/typography"
 
-// Ändere die ExportOptions-Schnittstelle, um die neue Option hinzuzufügen
 export interface ExportOptions {
-  guidelines: boolean
-  principles: boolean
-  categories: boolean
+  includeGuidelines: boolean
+  includePrinciples: boolean
+  includeCategories: boolean
   includeImages: boolean
-  onlyIncomplete?: boolean
 }
 
 interface ExportOptionsDialogProps {
@@ -29,7 +30,6 @@ interface ExportOptionsDialogProps {
   imagesCount: number
 }
 
-// Aktualisiere die Komponente, um die neue Option anzuzeigen
 export function ExportOptionsDialog({
   open,
   onOpenChange,
@@ -39,133 +39,75 @@ export function ExportOptionsDialog({
   categoriesCount,
   imagesCount,
 }: ExportOptionsDialogProps) {
-  const [options, setOptions] = useState<ExportOptions>({
-    guidelines: true,
-    principles: true,
-    categories: true,
-    includeImages: true,
-    onlyIncomplete: false,
-  })
-  const [isExporting, setIsExporting] = useState(false)
-  const { toast } = useToast()
+  const [includeGuidelines, setIncludeGuidelines] = useState(true)
+  const [includePrinciples, setIncludePrinciples] = useState(true)
+  const [includeCategories, setIncludeCategories] = useState(true)
+  const [includeImages, setIncludeImages] = useState(true)
 
   const handleExport = async () => {
+    const options: ExportOptions = {
+      includeGuidelines,
+      includePrinciples,
+      includeCategories,
+      includeImages,
+    }
     try {
-      setIsExporting(true)
       await onExport(options)
       onOpenChange(false)
     } catch (error) {
-      console.error("Error during export:", error)
-      toast({
-        title: "Export fehlgeschlagen",
-        description: "Beim Exportieren der Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsExporting(false)
+      // Fehlerbehandlung erfolgt im übergeordneten Komponenten
     }
-  }
-
-  // Berechne die geschätzte Dateigröße basierend auf den Optionen
-  const estimateFileSize = (): string => {
-    // Sehr grobe Schätzung - in einer realen Anwendung würde man das genauer berechnen
-    let size = 0
-    if (options.guidelines) size += guidelinesCount * 2 // 2KB pro Guideline ohne Bilder
-    if (options.principles) size += principlesCount * 1 // 1KB pro Principle
-    if (options.categories) size += categoriesCount * 0.1 // 0.1KB pro Kategorie
-    if (options.includeImages && options.guidelines) size += imagesCount * 100 // 100KB pro Bild (sehr grob)
-
-    // Wenn nur unvollständige Elemente exportiert werden, reduziere die Größe
-    if (options.onlyIncomplete) size = size * 0.3 // Annahme: ca. 30% sind unvollständig
-
-    // Formatiere die Größe
-    if (size < 1000) return `${Math.round(size)} KB`
-    return `${(size / 1000).toFixed(1)} MB`
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitleText>Exportoptionen</DialogTitleText>
-          <DialogDescriptionText>Wählen Sie aus, welche Daten exportiert werden sollen.</DialogDescriptionText>
+          <DialogTitle>Export Optionen</DialogTitle>
+          <DialogDescription>Wählen Sie aus, welche Daten exportiert werden sollen.</DialogDescription>
         </DialogHeader>
-
         <div className="grid gap-4 py-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="export-guidelines"
-              checked={options.guidelines}
-              onCheckedChange={(checked) => setOptions({ ...options, guidelines: checked === true })}
-            />
-            <Label htmlFor="export-guidelines" className="flex-1">
-              Guidelines ({guidelinesCount})
-            </Label>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="includeGuidelines"
+                checked={includeGuidelines}
+                onCheckedChange={(checked) => setIncludeGuidelines(!!checked)}
+              />
+              <Label htmlFor="includeGuidelines">CX Guidelines ({guidelinesCount})</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="includePrinciples"
+                checked={includePrinciples}
+                onCheckedChange={(checked) => setIncludePrinciples(!!checked)}
+              />
+              <Label htmlFor="includePrinciples">Psychologische Effekte ({principlesCount})</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="includeCategories"
+                checked={includeCategories}
+                onCheckedChange={(checked) => setIncludeCategories(!!checked)}
+              />
+              <Label htmlFor="includeCategories">Kategorien ({categoriesCount})</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="includeImages"
+                checked={includeImages}
+                onCheckedChange={(checked) => setIncludeImages(!!checked)}
+              />
+              <Label htmlFor="includeImages">Bilder ({imagesCount})</Label>
+            </div>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="export-principles"
-              checked={options.principles}
-              onCheckedChange={(checked) => setOptions({ ...options, principles: checked === true })}
-            />
-            <Label htmlFor="export-principles" className="flex-1">
-              Psychologische Prinzipien ({principlesCount})
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="export-categories"
-              checked={options.categories}
-              onCheckedChange={(checked) => setOptions({ ...options, categories: checked === true })}
-            />
-            <Label htmlFor="export-categories" className="flex-1">
-              Kategorien ({categoriesCount})
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="export-images"
-              checked={options.includeImages}
-              onCheckedChange={(checked) => setOptions({ ...options, includeImages: checked === true })}
-              disabled={!options.guidelines}
-            />
-            <Label htmlFor="export-images" className={`flex-1 ${!options.guidelines ? "text-muted-foreground" : ""}`}>
-              Bilder einschließen ({imagesCount})
-            </Label>
-          </div>
-
-          {/* Neue Option für unvollständige Elemente */}
-          <div className="flex items-center space-x-2 pt-2 border-t">
-            <Checkbox
-              id="export-incomplete"
-              checked={options.onlyIncomplete}
-              onCheckedChange={(checked) => setOptions({ ...options, onlyIncomplete: checked === true })}
-            />
-            <Label htmlFor="export-incomplete" className="flex-1">
-              Nur unvollständige Elemente exportieren
-            </Label>
-          </div>
-          <SmallText className="-mt-2 ml-6 text-muted-foreground">
-            Exportiert nur Guidelines und Prinzipien mit fehlenden Feldern oder Zuordnungen
-          </SmallText>
-
-          <SmallText className="mt-2 text-muted-foreground">Geschätzte Dateigröße: {estimateFileSize()}</SmallText>
         </div>
-
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isExporting}>
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Abbrechen
           </Button>
-          <Button
-            onClick={handleExport}
-            disabled={isExporting || (!options.guidelines && !options.principles && !options.categories)}
-            className="flex items-center gap-1"
-          >
-            <Download size={16} />
-            {isExporting ? "Exportiere..." : "Exportieren"}
+          <Button type="button" onClick={handleExport}>
+            Exportieren
           </Button>
         </DialogFooter>
       </DialogContent>

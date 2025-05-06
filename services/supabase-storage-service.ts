@@ -1,339 +1,317 @@
-import type { StorageInterface } from "./storage-interface"
-import type { StorageData, StorageStats } from "@/types/storage-data"
-import { createServerSupabaseClient } from "@/lib/supabase-client"
+import { createClient } from "@/lib/supabase-client"
+import type { StorageData } from "@/types/storage-data"
+import type { StorageService } from "./storage-interface"
 import type { Guideline } from "@/types/guideline"
-import { initialData } from "@/data/initial-data"
 
-export class SupabaseStorageService implements StorageInterface {
-  private readonly BUCKET_NAME = "guidelines-images"
+// Definiere die initialen Daten direkt hier
+const initialData: StorageData = {
+  principles: [],
+  guidelines: [],
+  categories: [],
+  elements: [],
+}
+
+export class SupabaseStorageService implements StorageService {
+  private supabase = createClient()
+  private tableName = "guidelines_data"
+  private recordId = "app_data"
+  private lastError: Error | null = null
+
+  constructor() {
+    console.log("SupabaseStorageService initialized")
+  }
+
+  // Get the last error that occurred
+  getLastError(): Error | null {
+    return this.lastError
+  }
+
+  async initializeTable(): Promise<boolean> {
+    try {
+      console.log("Versuche, die Tabelle zu erstellen, falls sie nicht existiert...")
+
+      // Verwende die from-Methode, um zu prüfen, ob die Tabelle existiert
+      // Wenn die Tabelle nicht existiert, wird ein Fehler ausgelöst
+      try {
+        const { data, error } = await this.supabase.from(this.tableName).select("id").limit(1)
+
+        if (error) {
+          console.error("Error checking if table exists:", error)
+
+          if (error.message.includes("does not exist")) {
+            console.log("Table does not exist, trying to create it...")
+          } else {
+            this.lastError = new Error(`Failed to check if table exists: ${error.message}`)
+            return false
+          }
+        } else {
+          console.log("Tabelle existiert bereits")
+          return true
+        }
+      } catch (error) {
+        console.log("Tabelle existiert möglicherweise nicht, versuche sie zu erstellen")
+      }
+
+      // Verwende die SQL-Funktion über RPC, um die Tabelle zu erstellen
+      const { error } = await this.supabase.rpc("create_guidelines_table")
+
+      if (error) {
+        console.error("Fehler beim Erstellen der Tabelle über RPC:", error)
+
+        // Wenn die RPC-Funktion nicht existiert oder fehlschlägt, verwenden wir einen Fallback
+        // Wir erstellen die Tabelle direkt über eine INSERT-Operation und fangen mögliche Fehler ab
+        try {
+          // Versuche, einen Datensatz einzufügen, um zu sehen, ob die Tabelle existiert
+          const { error: insertError } = await this.supabase.from(this.tableName).insert({
+            id: this.recordId,
+            data: initialData,
+            updated_at: new Date().toISOString(),
+          })
+
+          if (!insertError) {
+            console.log("Tabelle existiert und Daten wurden eingefügt")
+            return true
+          }
+
+          // Wenn ein Fehler auftritt, der nicht mit der Tabellenexistenz zusammenhängt
+          if (insertError && !insertError.message.includes("does not exist")) {
+            console.error("Fehler beim Einfügen von Daten:", insertError)
+            this.lastError = new Error(`Failed to insert data: ${insertError.message}`)
+            return false
+          }
+
+          // Wenn die Tabelle nicht existiert, können wir sie nicht direkt erstellen
+          // Wir müssen einen anderen Ansatz verwenden oder einen Fehler zurückgeben
+          console.error("Tabelle existiert nicht und kann nicht erstellt werden:", insertError)
+          this.lastError = new Error(`Table does not exist and cannot be created: ${insertError.message}`)
+          return false
+        } catch (insertError) {
+          console.error("Fehler beim Versuch, Daten einzufügen:", insertError)
+          this.lastError = insertError instanceof Error ? insertError : new Error(String(insertError))
+          return false
+        }
+      }
+
+      console.log("Tabelle erfolgreich erstellt")
+      return true
+    } catch (error) {
+      console.error("Fehler bei der Tabelleninitialisierung:", error)
+      this.lastError = error instanceof Error ? error : new Error(String(error))
+      return false
+    }
+  }
 
   async saveData(data: StorageData): Promise<boolean> {
     try {
-      console.log("saveData called")
+      console.log("Speichere Daten in Supabase...")
 
-      // Get the Supabase client - use server client for write operations
-      const supabase = createServerSupabaseClient()
-
-      // Save the data to Supabase
-      const { error } = await supabase
-        .from("guidelines_data")
-        .update({
-          data: data,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", "main")
-
-      if (error) {
-        console.error("Supabase error saving data:", error)
-        throw error
+      // Stelle sicher, dass die Tabelle existiert
+      const tableInitialized = await this.initializeTable()
+      if (!tableInitialized) {
+        console.error("Tabelle konnte nicht initialisiert werden")
+        return false
       }
 
+      // Ensure data has the correct structure
+      const normalizedData: StorageData = {
+        principles: Array.isArray(data.principles) ? data.principles : [],
+        guidelines: Array.isArray(data.guidelines) ? data.guidelines : [],
+        categories: Array.isArray(data.categories) ? data.categories : [],
+        elements: Array.isArray(data.elements) ? data.elements : [],
+        lastUpdated: data.lastUpdated || new Date().toISOString(),
+        version: data.version || "2.0",
+      }
+
+      // Speichere die Daten in der Tabelle
+      const { error } = await this.supabase.from(this.tableName).upsert(
+        {
+          id: this.recordId,
+          data: normalizedData,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "id",
+        },
+      )
+
+      if (error) {
+        console.error("Error saving data to Supabase:", error)
+        this.lastError = new Error(`Failed to save data: ${error.message}`)
+        return false
+      }
+
+      console.log("Daten erfolgreich in Supabase gespeichert")
       return true
     } catch (error) {
-      console.error("Error saving data:", error)
+      console.error("Fehler beim Speichern der Daten in Supabase:", error)
+      this.lastError = error instanceof Error ? error : new Error(String(error))
       return false
     }
   }
 
   async loadData(): Promise<StorageData> {
     try {
-      // Use server client for better reliability
-      const supabase = createServerSupabaseClient()
+      console.log("Versuche, Daten aus Supabase zu laden...")
 
-      console.log("Attempting to load data from Supabase...")
-
-      const { data, error } = await supabase.from("guidelines_data").select("data").eq("id", "main").single()
-
-      if (error) {
-        console.error("Supabase error loading data:", error)
-        throw error
+      // Stelle sicher, dass die Tabelle existiert
+      const tableInitialized = await this.initializeTable()
+      if (!tableInitialized) {
+        console.warn("Tabelle konnte nicht initialisiert werden, verwende initiale Daten")
+        return initialData
       }
 
-      if (data && data.data) {
-        console.log("Data loaded successfully from Supabase")
-        return data.data as StorageData
-      } else {
-        console.log("No data found, returning initial data")
+      // Versuche, Daten aus der Tabelle zu laden
+      try {
+        const { data, error } = await this.supabase.from(this.tableName).select("data").eq("id", this.recordId).single()
+
+        if (error) {
+          // Wenn der Fehler darauf hinweist, dass keine Daten gefunden wurden
+          if (error.code === "PGRST116") {
+            console.log("Keine Daten in Supabase gefunden, verwende initiale Daten...")
+
+            // Speichere die initialen Daten, wenn keine Daten gefunden wurden
+            await this.saveData(initialData)
+
+            return initialData
+          }
+
+          console.error("Error loading data from Supabase:", error)
+          this.lastError = new Error(`Failed to load data: ${error.message}`)
+          return initialData
+        }
+
+        if (!data || !data.data) {
+          console.log("Keine gültigen Daten in Supabase gefunden, verwende initiale Daten...")
+          return initialData
+        }
+
+        console.log("Daten erfolgreich aus Supabase geladen:", JSON.stringify(data.data).substring(0, 200) + "...")
+        console.log(
+          `Loaded ${data.data.guidelines?.length || 0} guidelines and ${data.data.principles?.length || 0} principles`,
+        )
+
+        // Ensure the data has the expected structure
+        const loadedData = data.data as StorageData
+
+        // Make sure all required arrays exist
+        if (!Array.isArray(loadedData.guidelines)) loadedData.guidelines = []
+        if (!Array.isArray(loadedData.principles)) loadedData.principles = []
+        if (!Array.isArray(loadedData.categories)) loadedData.categories = []
+        if (!Array.isArray(loadedData.elements)) loadedData.elements = []
+
+        return loadedData
+      } catch (error) {
+        // Wenn ein Fehler beim Laden auftritt, versuche zu erkennen, ob die Tabelle nicht existiert
+        console.error("Fehler beim Laden der Daten:", error)
+        this.lastError = error instanceof Error ? error : new Error(String(error))
+
+        // Verwende initiale Daten als Fallback
+        console.log("Verwende initiale Daten als Fallback...")
         return initialData
       }
     } catch (error) {
-      console.error("Error loading data:", error)
-
-      // Fallback to initial data if there's an error
-      console.log("Returning initial data due to error")
-      return initialData
+      console.error("Fehler beim Laden der Daten aus Supabase:", error)
+      this.lastError = error instanceof Error ? error : new Error(String(error))
+      return initialData // Verwende initiale Daten als Fallback
     }
   }
 
-  async uploadImage(file: File): Promise<{ url: string; name: string; base64?: string } | null> {
+  async getStats(): Promise<{ lastUpdated: string | null }> {
     try {
-      // First try to convert the image to Base64 for fallback
-      const base64 = await this.fileToBase64(file)
+      // Stelle sicher, dass die Tabelle existiert
+      const tableInitialized = await this.initializeTable()
+      if (!tableInitialized) {
+        return { lastUpdated: null }
+      }
 
+      // Lade die Daten aus der Tabelle
       try {
-        const formData = new FormData()
-        formData.append("image", file)
-        formData.append("name", file.name)
+        const { data, error } = await this.supabase
+          .from(this.tableName)
+          .select("updated_at")
+          .eq("id", this.recordId)
+          .single()
 
-        const response = await fetch("/api/supabase/upload-image", {
-          method: "POST",
-          body: formData,
-        })
-
-        const result = await response.json()
-
-        if (result.success) {
-          return {
-            url: result.url,
-            name: file.name,
-            base64: base64, // Also store the Base64 version for fallback
+        if (error) {
+          if (error.code === "PGRST116") {
+            // Keine Daten gefunden
+            return { lastUpdated: null }
           }
-        }
-      } catch (uploadError) {
-        console.error("Error uploading to Supabase, using Base64 fallback:", uploadError)
-      }
 
-      // Fallback: Use Base64 directly
-      return {
-        url: base64,
-        name: file.name,
-        base64: base64,
+          console.error("Error getting stats:", error)
+          this.lastError = new Error(`Failed to get stats: ${error.message}`)
+          return { lastUpdated: null }
+        }
+
+        return { lastUpdated: data?.updated_at || null }
+      } catch (error) {
+        console.error("Fehler beim Abrufen der Statistiken:", error)
+        this.lastError = error instanceof Error ? error : new Error(String(error))
+        return { lastUpdated: null }
       }
     } catch (error) {
-      console.error("Error in image upload:", error)
-      return null
-    }
-  }
-
-  async deleteImage(imageUrl: string): Promise<boolean> {
-    try {
-      // If it's a Base64 URL, we don't need to do anything
-      if (imageUrl.startsWith("data:")) {
-        return true
-      }
-
-      const response = await fetch("/api/supabase/delete-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url: imageUrl }),
-      })
-
-      const result = await response.json()
-      return result.success
-    } catch (error) {
-      console.error("Error deleting image:", error)
-      return false
-    }
-  }
-
-  async getStats(): Promise<StorageStats> {
-    try {
-      // Try to get statistics from Supabase
-      try {
-        // Get the Supabase client
-        const supabase = createServerSupabaseClient()
-
-        // Get the list of files in the bucket to count them
-        const { data: files, error } = await supabase.storage.from(this.BUCKET_NAME).list()
-
-        if (!error && files) {
-          // Calculate total size (this is an estimate as we don't have file sizes)
-          const totalSize = files.reduce((acc, file) => acc + (file.metadata?.size || 0), 0)
-
-          // Load the data to count the number of guidelines, categories, and principles
-          const data = await this.loadData()
-
-          return {
-            imagesCount: files.length,
-            totalSize,
-            lastUpdated: data.lastUpdated || new Date().toISOString(),
-            guidelinesCount: data.guidelines.length,
-            categoriesCount: data.categories.length,
-            principlesCount: data.principles.length,
-            databaseSize: JSON.stringify(data).length,
-          }
-        }
-      } catch (supabaseError) {
-        console.error("Error getting stats from Supabase:", supabaseError)
-      }
-
-      // Fallback: Calculate statistics from local data
-      const data = await this.loadData()
-
-      return {
-        imagesCount: 0,
-        totalSize: JSON.stringify(data).length,
-        lastUpdated: data.lastUpdated || new Date().toISOString(),
-        guidelinesCount: data.guidelines.length,
-        categoriesCount: data.categories.length,
-        principlesCount: data.principles.length,
-        databaseSize: JSON.stringify(data).length,
-      }
-    } catch (error) {
-      console.error("Error getting storage stats:", error)
-      return {
-        imagesCount: 0,
-        totalSize: 0,
-        lastUpdated: new Date().toISOString(),
-        guidelinesCount: 0,
-        categoriesCount: 0,
-        principlesCount: 0,
-        databaseSize: 0,
-      }
-    }
-  }
-
-  async saveGuideline(guideline: Guideline): Promise<boolean> {
-    try {
-      // First try to save the guideline via the API
-      try {
-        const response = await fetch("/api/supabase/save-guideline", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(guideline),
-        })
-
-        const result = await response.json()
-        if (result.success) {
-          // If the API returns a new ID, update the local guideline
-          if (result.id && result.id !== guideline.id) {
-            // Update the ID in the local data
-            const data = await this.loadData()
-            const updatedGuidelines = data.guidelines.map((g) => (g.id === guideline.id ? { ...g, id: result.id } : g))
-
-            await this.saveData({
-              ...data,
-              guidelines: updatedGuidelines,
-              lastUpdated: new Date().toISOString(),
-            })
-          }
-          return true
-        }
-      } catch (apiError) {
-        console.error("Error saving guideline via API:", apiError)
-      }
-
-      // Fallback: Update the data locally
-      const data = await this.loadData()
-
-      // Find the index of the guideline if it already exists
-      const index = data.guidelines.findIndex((g) => g.id === guideline.id)
-
-      if (index >= 0) {
-        // Update the existing guideline
-        data.guidelines[index] = {
-          ...guideline,
-          updatedAt: new Date().toISOString(), // Ensure updatedAt is an ISO string
-        }
-      } else {
-        // Add a new guideline
-        data.guidelines.push({
-          ...guideline,
-          createdAt: guideline.createdAt || new Date().toISOString(), // Generate new createdAt timestamp if not exists
-          updatedAt: new Date().toISOString(), // Ensure updatedAt is an ISO string
-        })
-      }
-
-      // Save the updated data
-      return await this.saveData(data)
-    } catch (error) {
-      console.error("Error saving guideline:", error)
-      return false
+      console.error("Fehler beim Abrufen der Statistiken:", error)
+      this.lastError = error instanceof Error ? error : new Error(String(error))
+      return { lastUpdated: null }
     }
   }
 
   async deleteGuideline(id: string): Promise<boolean> {
     try {
-      console.log(`Versuche, Guideline mit ID ${id} zu löschen...`)
+      // Lade die aktuellen Daten
+      const currentData = await this.loadData()
 
-      // First try to delete the guideline via the API
-      try {
-        const response = await fetch("/api/supabase/delete-guideline", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id }),
-        })
+      // Finde und entferne die Guideline
+      const updatedGuidelines = currentData.guidelines.filter((g) => g.id !== id)
 
-        // Log the raw response for debugging
-        console.log(`API-Antwort Status: ${response.status}`)
-
-        const result = await response.json()
-        console.log(`API-Antwort Inhalt:`, result)
-
-        if (result.success) {
-          console.log(`Guideline mit ID ${id} erfolgreich gelöscht`)
-          return true
-        }
-
-        // Wenn die API einen Fehler zurückgibt, werfen wir ihn
-        if (!result.success) {
-          throw new Error(result.error || "Unbekannter Fehler beim Löschen der Guideline")
-        }
-      } catch (apiError) {
-        console.error("Error deleting guideline via API:", apiError)
-
-        // Fallback aktivieren
-        console.log("Verwende Fallback-Methode zum Löschen...")
+      // Wenn keine Änderung, dann existiert die Guideline nicht
+      if (updatedGuidelines.length === currentData.guidelines.length) {
+        return false
       }
 
-      // Fallback: Delete the guideline locally
-      console.log("Fallback: Lösche Guideline lokal...")
-      const data = await this.loadData()
+      // Speichere die aktualisierten Daten
+      const success = await this.saveData({
+        ...currentData,
+        guidelines: updatedGuidelines,
+      })
 
-      // Filter out the guideline to be deleted
-      const originalLength = data.guidelines.length
-      data.guidelines = data.guidelines.filter((g) => g.id !== id)
-
-      // Check if anything was actually deleted
-      if (data.guidelines.length === originalLength) {
-        console.warn(`Guideline mit ID ${id} wurde nicht in den lokalen Daten gefunden`)
-        // Return true anyway to avoid UI errors
-        return true
-      }
-
-      // Save the updated data
-      const saveResult = await this.saveData(data)
-      console.log(`Lokales Speichern Ergebnis: ${saveResult}`)
-      return saveResult
+      return success
     } catch (error) {
-      console.error("Error deleting guideline:", error)
+      console.error("Fehler beim Löschen der Guideline:", error)
+      this.lastError = error instanceof Error ? error : new Error(String(error))
       return false
     }
   }
 
-  // Helper method to convert a file to Base64
-  private async fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = () => {
-        const result = reader.result as string
-        resolve(result)
+  async saveGuideline(guideline: Guideline): Promise<boolean> {
+    try {
+      // Lade die aktuellen Daten
+      const currentData = await this.loadData()
+
+      // Finde den Index der Guideline, falls sie bereits existiert
+      const index = currentData.guidelines.findIndex((g) => g.id === guideline.id)
+
+      let updatedGuidelines
+      if (index >= 0) {
+        // Aktualisiere die existierende Guideline
+        updatedGuidelines = [...currentData.guidelines]
+        updatedGuidelines[index] = guideline
+      } else {
+        // Füge eine neue Guideline hinzu
+        updatedGuidelines = [...currentData.guidelines, guideline]
       }
-      reader.onerror = (error) => {
-        reject(error)
-      }
-    })
-  }
 
-  // Helper method to clean image references
-  cleanImageReferences(data: any): any {
-    return data
-  }
+      // Speichere die aktualisierten Daten
+      const success = await this.saveData({
+        ...currentData,
+        guidelines: updatedGuidelines,
+      })
 
-  // Helper method to log debug information
-  async logDebug(message: string, data?: any): Promise<void> {
-    console.log(`[DEBUG] ${message}`, data)
-  }
-
-  // Helper method to export debug logs
-  async exportDebugLogs(): Promise<boolean> {
-    return true
+      return success
+    } catch (error) {
+      console.error("Fehler beim Speichern der Guideline:", error)
+      this.lastError = error instanceof Error ? error : new Error(String(error))
+      return false
+    }
   }
 }

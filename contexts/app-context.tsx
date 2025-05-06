@@ -1,555 +1,421 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useReducer, useEffect } from "react"
+
+import { createContext, useContext, useReducer, useEffect, useCallback } from "react"
+import type { ReactNode } from "react"
+import type { StorageData } from "@/types/storage-data"
 import type { Guideline, Principle } from "@/types/guideline"
 import { getStorageService } from "@/services/storage-factory"
 import { useToast } from "@/components/ui/use-toast"
-import type { StorageData } from "@/types/storage-data"
-// Fügen Sie diesen Import am Anfang der Datei hinzu
-import { FIXED_CATEGORIES } from "@/lib/constants"
 
-// State types
-interface AppState {
-  guidelines: Guideline[]
-  categories: string[]
-  principles: Principle[]
-  isLoaded: boolean
-  isLoading: boolean
-  hasError: boolean
-  errorMessage: string
-  stats: {
-    lastUpdated: string
-    databaseSize: number
-  } | null
+// Definiere die initialen Daten
+const initialData: StorageData = {
+  principles: [],
+  guidelines: [],
+  categories: [],
+  elements: [],
 }
 
-// Action types
+// Definiere den State-Typ
+interface AppState {
+  guidelines: Guideline[]
+  principles: Principle[]
+  categories: string[]
+  elements: string[]
+  isLoading: boolean
+  hasError: boolean
+  errorMessage: string | null
+}
+
+// Definiere die Action-Typen
 type AppAction =
-  | { type: "LOADING" }
-  | { type: "LOAD_DATA_SUCCESS"; payload: StorageData; stats?: any }
-  | { type: "LOAD_DATA_ERROR"; payload: string }
+  | { type: "SET_DATA"; payload: StorageData }
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_ERROR"; payload: string }
+  | { type: "CLEAR_ERROR" }
   | { type: "ADD_GUIDELINE"; payload: Guideline }
   | { type: "UPDATE_GUIDELINE"; payload: Guideline }
   | { type: "DELETE_GUIDELINE"; payload: string }
-  | { type: "SAVE_PRINCIPLES"; payload: Principle[] }
-  | { type: "IMPORT_DATA"; payload: StorageData }
-  | { type: "UPDATE_STATS"; payload: any }
+  | { type: "SET_PRINCIPLES"; payload: Principle[] }
 
-// Context type
-interface AppContextType {
-  state: AppState
-  addGuideline: (guideline: Guideline) => Promise<void>
-  updateGuideline: (guideline: Guideline) => Promise<void>
-  deleteGuideline: (id: string) => Promise<void>
-  savePrinciples: (principles: Principle[]) => Promise<void>
-  exportData: (options?: ExportOptions) => Promise<boolean>
-  refreshData: () => Promise<void>
-  batchUpdateGuidelines: (guidelines: Guideline[]) => Promise<void>
-}
-
-interface ExportOptions {
-  guidelines?: boolean
-  principles?: boolean
-  categories?: boolean
-  includeImages?: boolean
-  onlyIncomplete?: boolean
-}
-
-// Initial state
-const initialState: AppState = {
-  guidelines: [],
-  categories: [],
-  principles: [],
-  isLoaded: false,
-  isLoading: false,
-  hasError: false,
-  errorMessage: "",
-  stats: null,
-}
-
-// Create context
-const AppContext = createContext<AppContextType | undefined>(undefined)
-
-// Reducer function
+// Definiere den Reducer
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case "LOADING":
+    case "SET_DATA":
       return {
         ...state,
-        isLoading: true,
-      }
-    case "LOAD_DATA_SUCCESS":
-      return {
-        ...state,
-        guidelines: action.payload?.guidelines || [],
-        // Nur die fest definierten Kategorien verwenden
-        categories: FIXED_CATEGORIES,
-        principles: action.payload?.principles || [],
-        isLoaded: true,
-        isLoading: false,
+        guidelines: action.payload.guidelines || [],
+        principles: action.payload.principles || [],
+        categories: action.payload.categories || [],
+        elements: action.payload.elements || [],
         hasError: false,
-        errorMessage: "",
-        stats: action.stats || {
-          lastUpdated: action.payload?.lastUpdated || new Date().toISOString(),
-          databaseSize: 0,
-        },
+        errorMessage: null,
       }
-    case "LOAD_DATA_ERROR":
+    case "SET_LOADING":
       return {
         ...state,
-        isLoaded: true,
-        isLoading: false,
+        isLoading: action.payload,
+      }
+    case "SET_ERROR":
+      return {
+        ...state,
         hasError: true,
         errorMessage: action.payload,
       }
-    case "ADD_GUIDELINE": {
-      const newGuidelines = [...state.guidelines, action.payload]
-
-      // Extract any new categories
-      const newCategories = action.payload.categories.filter((cat) => !state.categories.includes(cat))
-      const updatedCategories = newCategories.length > 0 ? [...state.categories, ...newCategories] : state.categories
-
+    case "CLEAR_ERROR":
       return {
         ...state,
-        guidelines: newGuidelines,
-        categories: updatedCategories,
+        hasError: false,
+        errorMessage: null,
       }
-    }
-    case "UPDATE_GUIDELINE": {
-      const updatedGuidelines = state.guidelines.map((g) => (g.id === action.payload.id ? action.payload : g))
-
-      // Extract any new categories
-      const newCategories = action.payload.categories.filter((cat) => !state.categories.includes(cat))
-      const updatedCategories = newCategories.length > 0 ? [...state.categories, ...newCategories] : state.categories
-
+    case "ADD_GUIDELINE":
       return {
         ...state,
-        guidelines: updatedGuidelines,
-        categories: updatedCategories,
+        guidelines: [...state.guidelines, action.payload],
       }
-    }
-    case "DELETE_GUIDELINE": {
-      const filteredGuidelines = state.guidelines.filter((g) => g.id !== action.payload)
+    case "UPDATE_GUIDELINE":
       return {
         ...state,
-        guidelines: filteredGuidelines,
+        guidelines: state.guidelines.map((g) => (g.id === action.payload.id ? action.payload : g)),
       }
-    }
-    case "SAVE_PRINCIPLES":
+    case "DELETE_GUIDELINE":
+      return {
+        ...state,
+        guidelines: state.guidelines.filter((g) => g.id !== action.payload),
+      }
+    case "SET_PRINCIPLES":
       return {
         ...state,
         principles: action.payload,
-      }
-    case "IMPORT_DATA":
-      return {
-        ...state,
-        guidelines: action.payload?.guidelines || [],
-        categories: action.payload?.categories || [],
-        principles: action.payload?.principles || [],
-      }
-    case "UPDATE_STATS":
-      return {
-        ...state,
-        stats: action.payload,
       }
     default:
       return state
   }
 }
 
-// Provider component
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, initialState)
+// Definiere den Kontext-Typ
+interface AppContextType {
+  state: AppState
+  dispatch: React.Dispatch<AppAction>
+  addGuideline: (guideline: Guideline) => Promise<boolean>
+  updateGuideline: (guideline: Guideline) => Promise<boolean>
+  deleteGuideline: (id: string) => Promise<boolean>
+  savePrinciples: (principles: Principle[]) => Promise<boolean>
+  exportDebugLogs: () => void
+  refreshData: () => Promise<boolean>
+  exportData: (options: any) => Promise<boolean>
+}
+
+// Erstelle den Kontext
+const AppContext = createContext<AppContextType | undefined>(undefined)
+
+// Erstelle den Provider
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(appReducer, {
+    guidelines: [],
+    principles: [],
+    categories: [],
+    elements: [],
+    isLoading: true,
+    hasError: false,
+    errorMessage: null,
+  })
+
   const { toast } = useToast()
 
-  // Load data on initial render
+  // Lade die Daten beim ersten Rendern
   useEffect(() => {
-    const loadInitialData = async () => {
+    async function loadData() {
       try {
-        dispatch({ type: "LOADING" })
+        dispatch({ type: "SET_LOADING", payload: true })
+
         const storageService = getStorageService()
         const data = await storageService.loadData()
-        const stats = await storageService.getStats()
-        dispatch({ type: "LOAD_DATA_SUCCESS", payload: data, stats })
+
+        dispatch({ type: "SET_DATA", payload: data })
       } catch (error) {
+        console.error("Fehler beim Laden der Daten:", error)
         dispatch({
-          type: "LOAD_DATA_ERROR",
-          payload: "Failed to load your guidelines. Please try importing a backup if available.",
+          type: "SET_ERROR",
+          payload: `Fehler beim Laden der Daten: ${error instanceof Error ? error.message : String(error)}`,
         })
-
-        toast({
-          title: "Error loading data",
-          description: "There was a problem loading your guidelines. Please try importing a backup.",
-          variant: "destructive",
-        })
+      } finally {
+        dispatch({ type: "SET_LOADING", payload: false })
       }
     }
 
-    loadInitialData()
-  }, [toast])
+    loadData()
+  }, [])
 
-  // Refresh data from database
-  const refreshData = async () => {
+  // Speichere die Daten
+  const saveData = useCallback(async (data: StorageData): Promise<boolean> => {
     try {
-      dispatch({ type: "LOADING" })
+      dispatch({ type: "SET_LOADING", payload: true })
+
       const storageService = getStorageService()
-      const data = await storageService.loadData()
-      const stats = await storageService.getStats()
-      dispatch({ type: "LOAD_DATA_SUCCESS", payload: data, stats })
-
-      toast({
-        title: "Data refreshed",
-        description: "Your guidelines have been refreshed from the database.",
-      })
-    } catch (error) {
-      console.error("Error refreshing data:", error)
-
-      toast({
-        title: "Error refreshing data",
-        description: "There was a problem refreshing your data. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Action creators
-  const addGuideline = async (guideline: Guideline) => {
-    try {
-      const newGuideline = {
-        ...guideline,
-        id: guideline.id || Date.now().toString(),
-        createdAt: guideline.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        principles: guideline.principles || [],
-      }
-
-      dispatch({ type: "ADD_GUIDELINE", payload: newGuideline })
-
-      // Save to database
-      const storageService = getStorageService()
-      const success = await storageService.saveGuideline(newGuideline)
-
-      if (success) {
-        toast({
-          title: "Guideline added",
-          description: "Your guideline has been successfully saved to the database.",
-        })
-
-        // Update stats
-        const stats = await storageService.getStats()
-        dispatch({ type: "UPDATE_STATS", payload: stats })
-      } else {
-        throw new Error("Failed to save guideline to database")
-      }
-    } catch (error) {
-      console.error("Error adding guideline:", error)
-
-      toast({
-        title: "Error adding guideline",
-        description: "There was a problem adding your guideline. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const updateGuideline = async (guideline: Guideline) => {
-    try {
-      const updatedGuideline = {
-        ...guideline,
-        updatedAt: new Date().toISOString(),
-        principles: guideline.principles || [],
-      }
-
-      dispatch({ type: "UPDATE_GUIDELINE", payload: updatedGuideline })
-
-      // Save to database
-      const storageService = getStorageService()
-      const success = await storageService.saveGuideline(updatedGuideline)
-
-      if (success) {
-        toast({
-          title: "Guideline updated",
-          description: "Your changes have been saved to the database.",
-        })
-      } else {
-        throw new Error("Failed to save guideline to database")
-      }
-    } catch (error) {
-      console.error("Error updating guideline:", error)
-
-      toast({
-        title: "Error updating guideline",
-        description: "There was a problem updating your guideline. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const deleteGuideline = async (id: string) => {
-    try {
-      dispatch({ type: "DELETE_GUIDELINE", payload: id })
-
-      // Delete from database
-      const storageService = getStorageService()
-      const success = await storageService.deleteGuideline(id)
-
-      if (success) {
-        toast({
-          title: "Guideline deleted",
-          description: "The guideline has been removed from the database.",
-        })
-
-        // Update stats
-        const stats = await storageService.getStats()
-        dispatch({ type: "UPDATE_STATS", payload: stats })
-      } else {
-        throw new Error("Failed to delete guideline from database")
-      }
-    } catch (error) {
-      console.error("Error deleting guideline:", error)
-
-      toast({
-        title: "Error deleting guideline",
-        description: "There was a problem deleting your guideline. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const savePrinciples = async (principles: Principle[]) => {
-    try {
-      dispatch({ type: "SAVE_PRINCIPLES", payload: principles })
-
-      // Save to database
-      const storageService = getStorageService()
-      const data: StorageData = {
-        guidelines: state.guidelines,
-        categories: state.categories,
-        principles: principles,
-        lastUpdated: new Date().toISOString(),
-        version: "2.0",
-      }
-
       const success = await storageService.saveData(data)
 
       if (success) {
-        toast({
-          title: "Principles saved",
-          description: `${principles.length} principles have been saved to the database.`,
-        })
-
-        // Update stats
-        const stats = await storageService.getStats()
-        dispatch({ type: "UPDATE_STATS", payload: stats })
+        dispatch({ type: "SET_DATA", payload: data })
+        return true
       } else {
-        throw new Error("Failed to save principles to database")
+        throw new Error("Fehler beim Speichern der Daten")
       }
     } catch (error) {
-      console.error("Error saving principles:", error)
-
-      toast({
-        title: "Error saving principles",
-        description: "There was a problem saving the principles. Please try again.",
-        variant: "destructive",
+      console.error("Fehler beim Speichern der Daten:", error)
+      dispatch({
+        type: "SET_ERROR",
+        payload: `Fehler beim Speichern der Daten: ${error instanceof Error ? error.message : String(error)}`,
       })
+      return false
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
     }
-  }
+  }, [])
 
-  const exportData = async (options?: ExportOptions): Promise<boolean> => {
+  // Füge eine Guideline hinzu
+  const addGuideline = useCallback(
+    async (guideline: Guideline): Promise<boolean> => {
+      try {
+        // Speichere die Guideline in der Datenbank
+        const storageService = getStorageService()
+        const success = await storageService.saveGuideline(guideline)
+
+        if (success) {
+          // Aktualisiere den State
+          dispatch({ type: "ADD_GUIDELINE", payload: guideline })
+
+          // Aktualisiere die Kategorien, wenn neue hinzugefügt wurden
+          const newCategories = guideline.categories.filter((c) => !state.categories.includes(c))
+          if (newCategories.length > 0) {
+            const updatedData: StorageData = {
+              principles: state.principles,
+              guidelines: [...state.guidelines, guideline],
+              categories: [...state.categories, ...newCategories],
+              elements: state.elements,
+            }
+            await saveData(updatedData)
+          }
+
+          return true
+        } else {
+          throw new Error("Fehler beim Speichern der Guideline")
+        }
+      } catch (error) {
+        console.error("Fehler beim Hinzufügen der Guideline:", error)
+        dispatch({
+          type: "SET_ERROR",
+          payload: `Fehler beim Hinzufügen der Guideline: ${error instanceof Error ? error.message : String(error)}`,
+        })
+        return false
+      }
+    },
+    [saveData, state.categories, state.elements, state.guidelines, state.principles],
+  )
+
+  // Aktualisiere eine Guideline
+  const updateGuideline = useCallback(
+    async (guideline: Guideline): Promise<boolean> => {
+      try {
+        // Speichere die Guideline in der Datenbank
+        const storageService = getStorageService()
+        const success = await storageService.saveGuideline(guideline)
+
+        if (success) {
+          // Aktualisiere den State
+          dispatch({ type: "UPDATE_GUIDELINE", payload: guideline })
+
+          // Aktualisiere die Kategorien, wenn neue hinzugefügt wurden
+          const newCategories = guideline.categories.filter((c) => !state.categories.includes(c))
+          if (newCategories.length > 0) {
+            const updatedData: StorageData = {
+              principles: state.principles,
+              guidelines: state.guidelines.map((g) => (g.id === guideline.id ? guideline : g)),
+              categories: [...state.categories, ...newCategories],
+              elements: state.elements,
+            }
+            await saveData(updatedData)
+          }
+
+          return true
+        } else {
+          throw new Error("Fehler beim Aktualisieren der Guideline")
+        }
+      } catch (error) {
+        console.error("Fehler beim Aktualisieren der Guideline:", error)
+        dispatch({
+          type: "SET_ERROR",
+          payload: `Fehler beim Aktualisieren der Guideline: ${error instanceof Error ? error.message : String(error)}`,
+        })
+        return false
+      }
+    },
+    [saveData, state.categories, state.elements, state.guidelines, state.principles],
+  )
+
+  // Lösche eine Guideline
+  const deleteGuideline = useCallback(async (id: string): Promise<boolean> => {
     try {
-      // Standardoptionen, falls keine angegeben wurden
-      const exportOptions = options || {
-        guidelines: true,
-        principles: true,
-        categories: true,
-        includeImages: true,
-        onlyIncomplete: false,
-      }
-
-      // Filtere unvollständige Guidelines, wenn die Option aktiviert ist
-      let filteredGuidelines = state.guidelines
-      let filteredPrinciples = state.principles
-
-      if (exportOptions.onlyIncomplete) {
-        // Filtere unvollständige Guidelines
-        filteredGuidelines = state.guidelines.filter((guideline) => {
-          // Eine Guideline ist unvollständig, wenn:
-          return (
-            !guideline.title.trim() || // Kein Titel
-            !guideline.text.trim() || // Kein Text
-            !guideline.justification?.trim() || // Keine Begründung
-            guideline.categories.length === 0 || // Keine Kategorien
-            guideline.principles.length === 0
-          ) // Keine Prinzipien
-        })
-
-        // Filtere unvollständige Prinzipien
-        filteredPrinciples = state.principles.filter((principle) => {
-          // Ein Prinzip ist unvollständig, wenn:
-          return (
-            !principle.description?.trim() || // Keine Beschreibung
-            !principle.evidenz?.trim() || // Keine Evidenz
-            !principle.implikation?.trim() // Keine Implikation
-          )
-        })
-      }
-
-      // Daten für den Export vorbereiten
-      const data: StorageData = {
-        guidelines: exportOptions.guidelines
-          ? filteredGuidelines.map((guideline) => {
-              // Wenn Bilder nicht eingeschlossen werden sollen, entferne die Bildfelder
-              if (!exportOptions.includeImages) {
-                const { imageUrl, imageName, detailImageUrl, detailImageName, svgContent, detailSvgContent, ...rest } =
-                  guideline
-                return rest
-              }
-              return guideline
-            })
-          : [],
-        categories: exportOptions.categories ? state.categories : [],
-        principles: exportOptions.principles ? filteredPrinciples : [],
-        lastUpdated: new Date().toISOString(),
-        version: "2.0",
-        exportDate: new Date().toISOString(),
-      }
-
-      // JSON-String mit Formatierung erstellen
-      const jsonString = JSON.stringify(data, null, 2)
-
-      // Blob mit korrektem MIME-Typ erstellen
-      const blob = new Blob([jsonString], { type: "application/json" })
-
-      // Download-Link erstellen
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-
-      // Dateinamen mit Datum generieren
-      const date = new Date().toISOString().split("T")[0] // Format: YYYY-MM-DD
-      const filenameSuffix = exportOptions.onlyIncomplete ? "-incomplete" : ""
-      a.download = `guidelines-export-${date}${filenameSuffix}.json`
-      a.href = url
-
-      // Link zum DOM hinzufügen, klicken und entfernen
-      document.body.appendChild(a)
-      a.click()
-
-      // Kurze Verzögerung vor dem Aufräumen
-      setTimeout(() => {
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      }, 100)
-
-      // Erstelle eine Zusammenfassung der exportierten Daten
-      let exportSummary = ""
-      if (exportOptions.onlyIncomplete) {
-        exportSummary = `${exportOptions.guidelines ? filteredGuidelines.length : 0} unvollständige Guidelines und ${exportOptions.principles ? filteredPrinciples.length : 0} unvollständige Prinzipien wurden exportiert.`
-      } else {
-        exportSummary = `${exportOptions.guidelines ? filteredGuidelines.length : 0} Guidelines, ${exportOptions.categories ? state.categories.length : 0} Kategorien und ${exportOptions.principles ? filteredPrinciples.length : 0} Prinzipien wurden exportiert.`
-      }
-
-      toast({
-        title: "Export erfolgreich",
-        description: exportSummary,
-      })
-
+      dispatch({ type: "DELETE_GUIDELINE", payload: id })
       return true
     } catch (error) {
-      console.error("Fehler beim Exportieren der Daten:", error)
-
-      toast({
-        title: "Export fehlgeschlagen",
-        description: "Beim Exportieren der Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
-        variant: "destructive",
+      console.error("Fehler beim Löschen der Guideline:", error)
+      dispatch({
+        type: "SET_ERROR",
+        payload: `Fehler beim Löschen der Guideline: ${error instanceof Error ? error.message : String(error)}`,
       })
-
       return false
     }
-  }
+  }, [])
 
-  // Method for batch updates
-  const batchUpdateGuidelines = async (guidelines: Guideline[]) => {
-    try {
-      // Update state for each guideline
-      const updatedGuidelines = [...state.guidelines]
-      const newCategories = new Set<string>([...state.categories])
-
-      guidelines.forEach((guideline) => {
-        const index = updatedGuidelines.findIndex((g) => g.id === guideline.id)
-        const updatedGuideline = {
-          ...guideline,
-          updatedAt: new Date().toISOString(),
-          principles: guideline.principles || [],
+  // Speichere die Principles
+  const savePrinciples = useCallback(
+    async (principles: Principle[]): Promise<boolean> => {
+      try {
+        const updatedData: StorageData = {
+          principles,
+          guidelines: state.guidelines,
+          categories: state.categories,
+          elements: state.elements,
         }
 
-        if (index >= 0) {
-          updatedGuidelines[index] = updatedGuideline
+        const success = await saveData(updatedData)
+
+        if (success) {
+          dispatch({ type: "SET_PRINCIPLES", payload: principles })
+          return true
         } else {
-          updatedGuidelines.push({
-            ...updatedGuideline,
-            id: guideline.id || Date.now().toString(),
-            createdAt: guideline.createdAt || new Date().toISOString(),
-          })
+          throw new Error("Fehler beim Speichern der Principles")
         }
+      } catch (error) {
+        console.error("Fehler beim Speichern der Principles:", error)
+        dispatch({
+          type: "SET_ERROR",
+          payload: `Fehler beim Speichern der Principles: ${error instanceof Error ? error.message : String(error)}`,
+        })
+        return false
+      }
+    },
+    [saveData, state.categories, state.elements, state.guidelines],
+  )
 
-        // Collect categories
-        guideline.categories.forEach((cat) => newCategories.add(cat))
-      })
+  // Exportiere Debug-Logs
+  const exportDebugLogs = useCallback(() => {
+    try {
+      const debugData = {
+        state,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+      }
 
-      // Update state
-      dispatch({
-        type: "LOAD_DATA_SUCCESS",
-        payload: {
-          guidelines: updatedGuidelines,
-          categories: Array.from(newCategories),
-          principles: state.principles,
-          lastUpdated: new Date().toISOString(),
-          version: "2.0",
-        },
-      })
+      const blob = new Blob([JSON.stringify(debugData, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
 
-      // Save to database
-      const storageService = getStorageService()
-      const savePromises = guidelines.map((guideline) => storageService.saveGuideline(guideline))
-
-      await Promise.all(savePromises)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `debug-logs-${new Date().toISOString()}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
 
       toast({
-        title: "Batch update successful",
-        description: `Updated ${guidelines.length} guidelines in the database.`,
+        title: "Debug-Logs exportiert",
+        description: "Die Debug-Logs wurden erfolgreich exportiert.",
       })
-
-      // Update stats
-      const stats = await storageService.getStats()
-      dispatch({ type: "UPDATE_STATS", payload: stats })
     } catch (error) {
-      console.error("Error in batch update:", error)
-
+      console.error("Fehler beim Exportieren der Debug-Logs:", error)
       toast({
-        title: "Batch update failed",
-        description: "There was a problem updating multiple guidelines. Please try again.",
+        title: "Fehler beim Exportieren der Debug-Logs",
+        description: `Fehler: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
       })
     }
-  }
+  }, [state, toast])
 
-  // Context value
-  const contextValue: AppContextType = {
-    state,
-    addGuideline,
-    updateGuideline,
-    deleteGuideline,
-    savePrinciples,
-    exportData,
-    refreshData,
-    batchUpdateGuidelines,
-  }
+  // Aktualisiere die Daten
+  const refreshData = useCallback(async (): Promise<boolean> => {
+    try {
+      dispatch({ type: "SET_LOADING", payload: true })
 
-  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
+      const storageService = getStorageService()
+      const data = await storageService.loadData()
+
+      console.log("Refreshed data:", JSON.stringify(data).substring(0, 200) + "...")
+      console.log(`Loaded ${data.guidelines.length} guidelines and ${data.principles.length} principles`)
+
+      dispatch({ type: "SET_DATA", payload: data })
+      return true
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren der Daten:", error)
+      dispatch({
+        type: "SET_ERROR",
+        payload: `Fehler beim Aktualisieren der Daten: ${error instanceof Error ? error.message : String(error)}`,
+      })
+      return false
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
+    }
+  }, [dispatch])
+
+  // Exportiere die Daten
+  const exportData = useCallback(
+    async (options: any): Promise<boolean> => {
+      try {
+        // Erstelle die zu exportierenden Daten
+        const exportData: StorageData = {
+          principles: options.includePrinciples ? state.principles : [],
+          guidelines: options.includeGuidelines ? state.guidelines : [],
+          categories: options.includeCategories ? state.categories : [],
+          elements: state.elements,
+          lastUpdated: new Date().toISOString(),
+          version: "2.0",
+        }
+
+        // Erstelle einen Blob und lade ihn herunter
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+        const url = URL.createObjectURL(blob)
+
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `guidelines-export-${new Date().toISOString()}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+
+        return true
+      } catch (error) {
+        console.error("Fehler beim Exportieren der Daten:", error)
+        dispatch({
+          type: "SET_ERROR",
+          payload: `Fehler beim Exportieren der Daten: ${error instanceof Error ? error.message : String(error)}`,
+        })
+        return false
+      }
+    },
+    [state.categories, state.elements, state.guidelines, state.principles],
+  )
+
+  return (
+    <AppContext.Provider
+      value={{
+        state,
+        dispatch,
+        addGuideline,
+        updateGuideline,
+        deleteGuideline,
+        savePrinciples,
+        exportDebugLogs,
+        refreshData,
+        exportData,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  )
 }
 
-// Custom hook to use the context
+// Hook zum Zugriff auf den Kontext
 export function useAppContext() {
   const context = useContext(AppContext)
   if (context === undefined) {
@@ -557,5 +423,3 @@ export function useAppContext() {
   }
   return context
 }
-
-export { AppContext, type StorageData }

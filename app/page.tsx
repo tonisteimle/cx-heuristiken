@@ -21,8 +21,6 @@ import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppProvider, useAppContext } from "@/contexts/app-context"
-import { AuthProvider, useAuth } from "@/contexts/auth-context"
-import { LoginButton } from "@/components/login-dialog"
 import GuidelineForm from "@/components/guideline-form"
 import GuidelineList from "@/components/guideline-list"
 import PrincipleManager from "@/components/principle-manager"
@@ -32,6 +30,7 @@ import { UnifiedImportDialogTrigger } from "@/components/unified-import-dialog-t
 import { ExportOptionsDialog, type ExportOptions } from "@/components/export-options-dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Input } from "@/components/ui/input"
+import { testSupabaseConnection, initializeDatabase } from "@/lib/supabase-client"
 
 function GuidelinesManager() {
   const { toast } = useToast()
@@ -46,7 +45,6 @@ function GuidelinesManager() {
     exportData: exportAppData,
     dispatch,
   } = useAppContext()
-  const { isAuthenticated } = useAuth()
 
   const [editingGuideline, setEditingGuideline] = useState<Guideline | null>(null)
   const [isAddingGuideline, setIsAddingGuideline] = useState(false)
@@ -54,6 +52,8 @@ function GuidelinesManager() {
   const [isLoading, setIsLoading] = useState(false)
   const [isAddPrincipleDialogOpen, setIsAddPrincipleDialogOpen] = useState(false)
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<"checking" | "connected" | "error">("checking")
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
   // ViewMode-States für beide Ansichten
   const [principlesViewMode, setPrinciplesViewMode] = useState<"grid" | "list">("grid")
@@ -67,6 +67,42 @@ function GuidelinesManager() {
   const [searchTermPrinciples, setSearchTermPrinciples] = useState("")
   const [selectedElement, setSelectedElement] = useState<PrincipleElement>("all")
 
+  // Check Supabase connection on mount
+  useEffect(() => {
+    async function checkConnection() {
+      setConnectionStatus("checking")
+      setConnectionError(null)
+
+      try {
+        // First, try to initialize the database if needed
+        const initResult = await initializeDatabase()
+        if (!initResult.success) {
+          setConnectionStatus("error")
+          setConnectionError(`Failed to initialize database: ${initResult.error?.message || "Unknown error"}`)
+          return
+        }
+
+        // Then test the connection
+        const result = await testSupabaseConnection()
+        if (!result.success) {
+          setConnectionStatus("error")
+          setConnectionError(`Failed to connect to Supabase: ${result.error?.message || "Unknown error"}`)
+          return
+        }
+
+        setConnectionStatus("connected")
+
+        // Force refresh data
+        await refreshAppContextData()
+      } catch (error) {
+        setConnectionStatus("error")
+        setConnectionError(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+
+    checkConnection()
+  }, [refreshAppContextData])
+
   useEffect(() => {
     console.log(
       `Current state has ${state.guidelines.length} guidelines, ${state.categories.length} categories, and ${state.principles.length} principles`,
@@ -74,7 +110,6 @@ function GuidelinesManager() {
   }, [state.guidelines.length, state.categories.length, state.principles.length])
 
   const handleEdit = (guideline: Guideline) => {
-    if (!isAuthenticated) return
     setEditingGuideline(guideline)
     setIsAddingGuideline(true)
   }
@@ -179,6 +214,26 @@ function GuidelinesManager() {
     return state.guidelines.filter((g) => g.imageUrl || g.detailImageUrl || g.svgContent || g.detailSvgContent).length
   }
 
+  // Handle manual refresh
+  const handleManualRefresh = async () => {
+    setIsLoading(true)
+    try {
+      await refreshAppContextData()
+      toast({
+        title: "Daten aktualisiert",
+        description: "Die Daten wurden erfolgreich aktualisiert.",
+      })
+    } catch (error) {
+      toast({
+        title: "Fehler beim Aktualisieren",
+        description: `Fehler: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <main className="container mx-auto px-4">
       {state.hasError && (
@@ -190,6 +245,21 @@ function GuidelinesManager() {
             <div className="mt-2">
               <Button variant="outline" size="sm" onClick={exportDebugLogs}>
                 Export Debug Logs
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {connectionStatus === "error" && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Supabase Connection Error</AlertTitle>
+          <AlertDescription>
+            {connectionError}
+            <div className="mt-4">
+              <Button variant="outline" size="sm" onClick={handleManualRefresh}>
+                Retry Connection
               </Button>
             </div>
           </AlertDescription>
@@ -260,40 +330,32 @@ function GuidelinesManager() {
 
                 {/* Rechter Bereich: Aktionsbuttons */}
                 <div className="flex items-center gap-2">
+                  {/* Refresh Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleManualRefresh}
+                    disabled={isLoading}
+                    className="flex items-center gap-1"
+                  >
+                    <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+                    {isLoading ? "Refreshing..." : "Refresh"}
+                  </Button>
+
                   {/* Import Button */}
-                  {isAuthenticated && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const importDialog = document.getElementById("unified-import-dialog-trigger")
-                        if (importDialog) {
-                          ;(importDialog as HTMLButtonElement).click()
-                        }
-                      }}
-                    >
-                      Import
-                    </Button>
-                  )}
+                  <UnifiedImportDialogTrigger />
 
                   {/* Export Button */}
-                  {isAuthenticated && (
-                    <Button variant="outline" size="sm" onClick={openExportDialog} className="flex items-center gap-1">
-                      <Download size={14} />
-                      Export
-                    </Button>
-                  )}
-
-                  {/* Login Button */}
-                  <LoginButton />
+                  <Button variant="outline" size="sm" onClick={openExportDialog} className="flex items-center gap-1">
+                    <Download size={14} />
+                    Export
+                  </Button>
 
                   {/* Kontextabhängiger Hinzufügen-Button */}
-                  {isAuthenticated && (
-                    <Button onClick={handleAddButtonClick} size="sm" className="ml-2">
-                      <PlusCircle size={14} className="mr-1" />
-                      Add
-                    </Button>
-                  )}
+                  <Button onClick={handleAddButtonClick} size="sm" className="ml-2">
+                    <PlusCircle size={14} className="mr-1" />
+                    Add
+                  </Button>
                 </div>
               </div>
             </div>
@@ -358,7 +420,7 @@ function GuidelinesManager() {
               <PrincipleManager
                 principles={state.principles}
                 onSave={savePrinciples}
-                isAuthenticated={isAuthenticated}
+                isAuthenticated={true} // Immer als authentifiziert betrachten
                 isAddDialogOpen={isAddPrincipleDialogOpen}
                 onAddDialogOpenChange={setIsAddPrincipleDialogOpen}
                 headerHeight={0}
@@ -382,13 +444,28 @@ function GuidelinesManager() {
                     <RefreshCw size={24} className="mx-auto animate-spin mb-4" />
                     <p className="text-muted-foreground">Loading guidelines from database...</p>
                   </div>
+                ) : state.guidelines.length === 0 && connectionStatus === "connected" ? (
+                  <div className="text-center py-12">
+                    <AlertCircle size={24} className="mx-auto mb-4 text-amber-500" />
+                    <h3 className="text-lg font-medium mb-2">No Guidelines Found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Your database is connected but no guidelines were found. Try importing data or adding new
+                      guidelines.
+                    </p>
+                    <div className="flex justify-center gap-4">
+                      <Button onClick={() => setIsAddingGuideline(true)}>
+                        <PlusCircle size={16} className="mr-2" />
+                        Add Guideline
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <GuidelineList
                     guidelines={state.guidelines}
                     principles={state.principles}
                     onEdit={handleEdit}
                     onDelete={handleDeleteGuideline}
-                    isAuthenticated={isAuthenticated}
+                    isAuthenticated={true} // Immer als authentifiziert betrachten
                     headerHeight={73}
                     inFixedHeader={false}
                     searchTerm={searchTermGuidelines}
@@ -407,11 +484,26 @@ function GuidelinesManager() {
                     <RefreshCw size={24} className="mx-auto animate-spin mb-4" />
                     <p className="text-muted-foreground">Loading principles from database...</p>
                   </div>
+                ) : state.principles.length === 0 && connectionStatus === "connected" ? (
+                  <div className="text-center py-12">
+                    <AlertCircle size={24} className="mx-auto mb-4 text-amber-500" />
+                    <h3 className="text-lg font-medium mb-2">No Principles Found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Your database is connected but no principles were found. Try importing data or adding new
+                      principles.
+                    </p>
+                    <div className="flex justify-center gap-4">
+                      <Button onClick={() => setIsAddPrincipleDialogOpen(true)}>
+                        <PlusCircle size={16} className="mr-2" />
+                        Add Principle
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <PrincipleManager
                     principles={state.principles}
                     onSave={savePrinciples}
-                    isAuthenticated={isAuthenticated}
+                    isAuthenticated={true} // Immer als authentifiziert betrachten
                     isAddDialogOpen={isAddPrincipleDialogOpen}
                     onAddDialogOpenChange={setIsAddPrincipleDialogOpen}
                     headerHeight={73}
@@ -442,18 +534,15 @@ function GuidelinesManager() {
       />
 
       <Toaster />
-      <UnifiedImportDialogTrigger />
     </main>
   )
 }
 
-// Wrap the component with the AppProvider and AuthProvider
+// Wrap the component with the AppProvider
 export default function Page() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <GuidelinesManager />
-      </AppProvider>
-    </AuthProvider>
+    <AppProvider>
+      <GuidelinesManager />
+    </AppProvider>
   )
 }

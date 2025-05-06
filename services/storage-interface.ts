@@ -1,17 +1,10 @@
 import type { StorageData } from "@/types/storage-data"
 import type { Guideline } from "@/types/guideline"
 
-export interface StorageInterface {
-  // Data operations
-  saveData(data: StorageData, isIncremental?: boolean): Promise<boolean>
+export interface StorageService {
+  saveData(data: StorageData): Promise<boolean>
   loadData(): Promise<StorageData>
-  saveGuideline(guideline: Guideline): Promise<boolean>
+  getStats(): Promise<{ lastUpdated: string | null }>
   deleteGuideline(id: string): Promise<boolean>
-
-  // Image operations
-  uploadImage(file: File): Promise<{ url: string; name: string; base64?: string } | null>
-  deleteImage(url: string): Promise<boolean>
-
-  // Stats
-  getStats(): Promise<any>
+  saveGuideline(guideline: Guideline): Promise<boolean>
 }
