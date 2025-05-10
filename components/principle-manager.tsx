@@ -135,7 +135,7 @@ export default function PrincipleManager({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-y-auto">
       {!inFixedHeader && (
         <div className="flex flex-wrap items-center gap-4 mb-4">
           <div className="relative flex-1 min-w-[200px]">

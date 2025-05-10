@@ -12,15 +12,18 @@ import { AppProvider, useAppContext } from "@/contexts/app-context"
 import GuidelineForm from "@/components/guideline-form"
 import GuidelineList from "@/components/guideline-list"
 import PrincipleManager from "@/components/principle-manager"
+import HomePage from "./home"
 import type { Guideline, Principle, PrincipleElement } from "@/types/guideline"
 import { getStorageService } from "@/services/storage-factory"
 import { ExportOptionsDialog, type ExportOptions } from "@/components/export-options-dialog"
 import { Input } from "@/components/ui/input"
 import { testSupabaseConnection, initializeDatabase } from "@/lib/supabase-client"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useSearchParams } from "next/navigation"
 
 function GuidelinesManager() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
   const {
     state,
     addGuideline,
@@ -41,6 +44,7 @@ function GuidelinesManager() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<"checking" | "connected" | "error">("checking")
   const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [showHomePage, setShowHomePage] = useState(true)
 
   // ViewMode-States für beide Ansichten
   const [principlesViewMode, setPrinciplesViewMode] = useState<"grid" | "list">("grid")
@@ -98,6 +102,14 @@ function GuidelinesManager() {
       `Current state has ${state.guidelines.length} guidelines, ${state.categories.length} categories, and ${state.principles.length} principles`,
     )
   }, [state.guidelines.length, state.categories.length, state.principles.length])
+
+  useEffect(() => {
+    // Check if we should skip the homepage based on URL parameter
+    const skipHome = searchParams.get("skipHome") === "true"
+    if (skipHome) {
+      setShowHomePage(false)
+    }
+  }, [searchParams])
 
   const handleEdit = (guideline: Guideline) => {
     setEditingGuideline(guideline)
@@ -224,6 +236,10 @@ function GuidelinesManager() {
     }
   }
 
+  if (showHomePage) {
+    return <HomePage />
+  }
+
   return (
     <main className="container mx-auto px-4">
       {state.hasError && (
@@ -295,12 +311,12 @@ function GuidelinesManager() {
       ) : (
         <div className="flex flex-col">
           {/* Combined header and search container with continuous background */}
-          <div className="fixed top-0 left-0 right-0 z-50 bg-white">
+          <div className={`fixed top-0 left-0 right-0 z-50 bg-white ${activeTab === "principles" ? "h-auto" : ""}`}>
             {/* Header section */}
             <div className="container mx-auto px-4">
               <div className="flex justify-between items-center py-4">
                 {/* Linker Bereich: Titel */}
-                <h1 className="text-2xl font-bold text-gray-700">Guidelines</h1>
+                <h1 className="text-2xl font-bold text-gray-700">CX Guidelines</h1>
 
                 {/* Mittlerer Bereich: Tabs */}
                 <div className="absolute left-1/2 transform -translate-x-1/2">
@@ -322,7 +338,7 @@ function GuidelinesManager() {
                 <div className="flex items-center gap-2">
                   {/* ERGOSIGN Logo */}
                   <img
-                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Bildschirmfoto%202025-05-06%20um%2015.33.11-UjNVhhdUL4pHyOYzVhUXHV7AMfqwcF.png"
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-rYTABolBUBWveDJBn941qJSCd8oH9V.png"
                     alt="ERGOSIGN"
                     className="h-10"
                   />
@@ -405,21 +421,76 @@ function GuidelinesManager() {
             )}
 
             {activeTab === "principles" && !state.isLoading && (
-              <PrincipleManager
-                principles={state.principles}
-                onSave={savePrinciples}
-                isAuthenticated={true} // Immer als authentifiziert betrachten
-                isAddDialogOpen={isAddPrincipleDialogOpen}
-                onAddDialogOpenChange={setIsAddPrincipleDialogOpen}
-                headerHeight={0}
-                inFixedHeader={true}
-                searchTerm={searchTermPrinciples}
-                onSearchChange={setSearchTermPrinciples}
-                selectedElement={selectedElement}
-                onElementChange={setSelectedElement}
-                viewMode={principlesViewMode}
-                onViewModeChange={setPrinciplesViewMode}
-              />
+              <div className="container mx-auto px-4 pb-4">
+                <div className="flex flex-wrap items-center gap-4 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Prinzipien durchsuchen..."
+                      value={searchTermPrinciples}
+                      onChange={(e) => setSearchTermPrinciples(e.target.value)}
+                      className="pl-9"
+                    />
+                    {searchTermPrinciples && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                        onClick={() => setSearchTermPrinciples("")}
+                      >
+                        <X size={14} />
+                      </Button>
+                    )}
+                  </div>
+
+                  <Select
+                    value={selectedElement}
+                    onValueChange={(value) => setSelectedElement(value as PrincipleElement)}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Alle Elemente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["all", "ui", "ux", "content", "other", "decision"].map((element) => (
+                        <SelectItem key={element} value={element}>
+                          {element === "all" ? "Alle Elemente" : element.charAt(0).toUpperCase() + element.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    {
+                      state.principles.filter((principle) => {
+                        const titleMatch = (principle.title || principle.name || "")
+                          .toLowerCase()
+                          .includes(searchTermPrinciples.toLowerCase())
+                        const descriptionMatch = principle.description
+                          .toLowerCase()
+                          .includes(searchTermPrinciples.toLowerCase())
+                        const elementMatch =
+                          selectedElement === "all" ||
+                          principle.element === selectedElement ||
+                          (Array.isArray(principle.elements) && principle.elements.includes(selectedElement))
+                        return (searchTermPrinciples === "" || titleMatch || descriptionMatch) && elementMatch
+                      }).length
+                    }{" "}
+                    von {state.principles.length}
+                    {(searchTermPrinciples || selectedElement !== "all") && " (gefiltert)"}
+                  </div>
+
+                  <div className="flex gap-2 ml-auto">
+                    <Button
+                      onClick={() => setIsAddPrincipleDialogOpen(true)}
+                      size="sm"
+                      className="flex items-center gap-1"
+                    >
+                      <PlusCircle size={14} className="mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -466,7 +537,7 @@ function GuidelinesManager() {
                 )}
               </div>
             ) : (
-              <div>
+              <div className="pt-6">
                 {state.isLoading ? (
                   <div className="text-center py-12">
                     <RefreshCw size={24} className="mx-auto animate-spin mb-4" />

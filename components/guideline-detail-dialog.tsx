@@ -38,10 +38,12 @@ export function GuidelineDetailDialog({
         </DialogHeader>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onEdit(guideline)}>
-            <Pencil size={14} className="mr-1" />
-            Bearbeiten
-          </Button>
+          {
+            <Button variant="outline" onClick={() => onEdit(guideline)}>
+              <Pencil size={14} className="mr-1" />
+              Bearbeiten
+            </Button>
+          }
           <Button onClick={() => onOpenChange(false)}>Schließen</Button>
         </DialogFooter>
       </DialogContent>
